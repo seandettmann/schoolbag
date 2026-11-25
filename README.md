@@ -94,4 +94,6 @@ is a placeholder thumbnail (no game art) if the uploader asks for one.
 
 ## License
 
-Not chosen yet.
+GPL-3.0 (see [`LICENSE`](LICENSE)), the same as isaac-hud. It covers
+Schoolbag's own code and docs. The game's art isn't in this repository and
+isn't covered by it: it belongs to Edmund McMillen and Nicalis.
