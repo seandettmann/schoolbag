@@ -13,7 +13,8 @@ device can reach it.
 
 | Path | Answer |
 |---|---|
-| `GET /state` | The full state below, as JSON. |
+| `GET /state` | The full state below, as JSON. Hides the game's HUD while the app keeps reading (below). |
+| `GET /state?hud=keep` | The same state, without hiding the game's HUD (the app's "Hide the game's HUD" setting turned off). If the HUD was hidden, it comes straight back. |
 | `GET /health` | `ok` (plain text). Cheap check that the mod is up. Doesn't hide the HUD. |
 | `POST /strings` | The game's words, from the app (below). Answers `ok <count>`, or `400` if the body isn't a JSON object. |
 | anything else | `404`. |
@@ -35,7 +36,8 @@ HUD on the main screen, since the app shows it on the other screen. It comes
 back by itself 3 seconds after the last `/state` read, when the run ends, and
 on the menus, so a closed app or a switched-off bottom screen never leaves the
 player without a HUD. Reading while paused keeps it
-hidden.
+hidden. Reading with `?hud=keep` never hides it, and gives it back at once if
+it was hidden.
 
 **Tainted Cain:** on a Tainted Cain run, the HUD stays showing while his Bag
 of Crafting is full, or while the mod isn't sure what's in it (`bag.sure` is
@@ -138,6 +140,7 @@ The mod never sends what the game is hiding from the player:
 |---|---|
 | `inRun` | `true` while a run is going. |
 | `strings` | How many of the game's words the app has sent with `POST /strings`. 0 means send them. |
+| `hudHidden` | `true` while the mod is hiding the game's HUD. |
 | `paused` | The game is on its pause screen. The mod keeps answering while paused. |
 | `transition` | Present while the player is leaving the floor: `"trapdoor"` or `"beam"`. The app shows the loading doodle until the next floor's data arrives. |
 
@@ -244,6 +247,8 @@ Player 1 is first. Co-op players, Jacob & Esau and similar follow.
 | `pockets[]` | Cards and runes (`kind: "card"`), pills (`kind: "pill"`, with `color`, `identified` and, once identified, `effect`). Pocket actives are in `actives`. |
 | `items[]` | Passive and active collectibles **in pickup order**, duplicates kept. Saved with the run, so continuing a run keeps the order. |
 | `forms[]` | Progress toward each transformation, indexed by `PlayerForm` number. |
+| `poops` | Tainted ??? only. `queue` is his upcoming poop spells, next first (up to 6, the length of the game's queue), as `PoopSpellType` numbers (1 normal, 2 corny, 3 burning, 4 stone, 5 stinky, 6 black, 7 holy, 8 liquid, 9 fart, 10 bomb, 11 diarrhea; the frames of `ui_poops.anm2`). `max` is how many poops he can hold. How many he holds now is `pickups.poopMana`. |
+| `otherForm` | The Forgotten and The Soul only: `type` and `health` of the form **not** in control (`type` and `health` above are the one in control). Left out under Curse of the Unknown, like `health`. |
 | `bag` | Only while the player holds the Bag of Crafting (Tainted Cain's pocket). `items` lists what's in it, oldest first, as the game's crafting components 1–29 (the frames of `ui_crafting.anm2`: 1 red heart, 2 soul heart, 3 black heart, 4 eternal heart, 5 gold heart, 6 bone heart, 7 rotten heart, 8 penny, 9 nickel, 10 dime, 11 lucky penny, 12 key, 13 golden key, 14 charged key, 15 bomb, 16 golden bomb, 17 giga bomb, 18 micro battery, 19 lil' battery, 20 mega battery, 21 card, 22 pill, 23 rune or soul stone, 24 dice shard, 25 cracked key, 26 golden penny, 27 golden pill, 28 golden battery, 29 poop). At most 8. See "The Bag of Crafting" below. |
 
 ### The Bag of Crafting

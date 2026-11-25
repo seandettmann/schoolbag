@@ -43,6 +43,24 @@ function S.tcain() -- the Bag of Crafting in the pocket, with a penny on the flo
   W.knives = { { Variant = 4, Position = { X = 320, Y = 300 } } }
 end
 function S.scooped() W.pickups = {} W.knives = {} end
+function S.bluebaby() -- Tainted ???: poop spells queued (stone, normal, burning)
+  W.playerType = 25
+  local queue = { 4, 1, 3 }
+  PLAYER.GetPoopMana = function() return 2 end
+  PLAYER.GetMaxPoopMana = function() return 9 end
+  PLAYER.GetPoopSpell = function(_, pos) return queue[pos + 1] or 0 end
+end
+function S.forgotten() -- The Forgotten in control; The Soul holds 2 and a half soul hearts
+  W.playerType = 16
+  local soul = setmetatable({}, { __index = PLAYER })
+  function soul:GetPlayerType() return 17 end
+  function soul:GetMaxHearts() return 0 end
+  function soul:GetHearts() return 0 end
+  function soul:GetSoulHearts() return 5 end
+  function soul:GetBlackHearts() return 0 end
+  PLAYER.GetSubPlayer = function() return soul end
+end
+function S.plain() W.playerType = 0 end
 
 local stop = socket.gettime() + 60
 while socket.gettime() < stop do

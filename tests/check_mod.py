@@ -127,6 +127,29 @@ try:
     bag = s["players"][0].get("bag")
     check(bag == {"items": [8], "sure": True}, f"the penny the bag scooped is in it: {bag}")
 
+    print("Tainted ??? and The Forgotten")
+    check("poops" not in s["players"][0] and "otherForm" not in s["players"][0], "no poops or other form for other characters")
+    step("bluebaby")
+    s, _ = state()
+    poops = s["players"][0].get("poops")
+    check(poops == {"max": 9, "queue": [4, 1, 3]}, f"Tainted ???'s poop queue, next first: {poops}")
+    step("forgotten")
+    s, _ = state()
+    other = s["players"][0].get("otherForm")
+    check(other and other["type"] == 17 and other["health"]["soulHearts"] == 5 and other["health"]["maxHearts"] == 0,
+          f"The Forgotten's other form (The Soul) and its hearts: {other}")
+    step("cursed")
+    s, _ = state()
+    check("otherForm" not in s["players"][0], "Curse of the Unknown hides the other form's hearts too")
+    step("uncursed")
+    step("plain")
+
+    print("reading without hiding the HUD")
+    status, _, body = get("/state?hud=keep")
+    check(status == 200 and json.loads(body)["inRun"] is True, "/state?hud=keep answers like /state")
+    s, _ = state()
+    check(isinstance(s.get("hudHidden"), bool), "state says whether the mod is hiding the HUD")
+
     step("quit", settle=0.1)
 finally:
     time.sleep(0.2)

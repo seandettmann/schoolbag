@@ -185,6 +185,21 @@ def scenario(name):
         p["actives"].append({"slot": 2, "id": 710, "name": "#BAG_OF_CRAFTING_NAME", "charge": 0,
                              "maxCharge": 0, "chargeType": 0, "battery": 0})
         p["bag"] = {"items": [8, 8, 1, 12, 15, 2, 22, 21], "sure": True}
+    elif name == "tbluebaby":
+        # Tainted ???: 2 poops to place; the queue shows what comes next (PoopSpellType)
+        p["type"], p["name"] = 25, "???"
+        p["health"].update({"maxHearts": 0, "hearts": 0, "soulHearts": 6, "blackMask": 0})
+        p["pickups"]["poopMana"] = 2
+        p["poops"] = {"max": 9, "queue": [4, 1, 3, 1, 7, 2]}
+    elif name == "forgotten":
+        # The Forgotten in control (bone hearts); The Soul holds the soul hearts
+        p["type"], p["name"] = 16, "The Forgotten"
+        p["health"].update({"maxHearts": 0, "hearts": 5, "soulHearts": 0, "blackMask": 0,
+                            "boneHearts": 4, "boneMask": 15})
+        p["otherForm"] = {"type": 17, "health": {
+            "hidden": False, "maxHearts": 0, "hearts": 0, "soulHearts": 5, "blackMask": 0,
+            "boneHearts": 0, "boneMask": 0, "goldenHearts": 0, "eternalHearts": 0,
+            "rottenHearts": 0, "brokenHearts": 0, "heartLimit": 12}}
     else:
         raise KeyError(name)
     return s
@@ -192,7 +207,8 @@ def scenario(name):
 
 SCENARIOS = ["normal", "notinrun", "offline", "paused", "lost", "unknown", "blind", "loading",
              "dead", "active0", "active1", "greed", "challenge", "shields", "shieldsall",
-             "bossrush", "hush", "devil", "emptyroom", "newitem", "pills", "tcain"]
+             "bossrush", "hush", "devil", "emptyroom", "newitem", "pills", "tcain",
+             "tbluebaby", "forgotten"]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -236,6 +252,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, "not found", "text/plain")
         state = scenario(Handler.current)
         state["strings"] = len(Handler.strings)
+        # like the mod: reading hides the game's HUD unless the app asks ?hud=keep
+        state["hudHidden"] = bool(state.get("inRun")) and "hud=keep" not in self.path
         if state.get("inRun") and state.get("run") and not state.get("paused"):
             # the run clock keeps ticking (30 frames per second)
             state["run"]["timeFrames"] += int((time.time() - Handler.started) * 30)

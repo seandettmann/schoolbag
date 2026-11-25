@@ -758,6 +758,38 @@ local function formsInfo(p)
   return list
 end
 
+-- Tainted ???'s poops: the queue of upcoming poop spells (PoopSpellType
+-- numbers, next first) and how many he can hold.
+local PLAYER_BLUEBABY_B = enum(PlayerType, "PLAYER_BLUEBABY_B", 25)
+-- The game's queue length (its own enum says 6); asking past it isn't safe.
+local POOP_QUEUE = enum(PoopSpellType, "SPELL_QUEUE_SIZE", 6)
+local POOP_TYPES = enum(PoopSpellType, "SPELL_COUNT", 12) -- types run 1 to this minus 1
+
+local function poopsInfo(p)
+  if try(function() return p:GetPlayerType() end) ~= PLAYER_BLUEBABY_B then return nil end
+  local queue = {}
+  for pos = 0, POOP_QUEUE - 1 do
+    local spell = try(function() return p:GetPoopSpell(pos) end)
+    if type(spell) ~= "number" or spell <= 0 or spell >= POOP_TYPES then break end
+    queue[#queue + 1] = spell
+  end
+  -- how many he holds is pickups.poopMana
+  return { max = try(function() return p:GetMaxPoopMana() end), queue = queue }
+end
+
+-- The Forgotten and The Soul are one player with two forms, each with its own
+-- hearts. `health` is the form in control; this is the other one.
+local PLAYER_THEFORGOTTEN = enum(PlayerType, "PLAYER_THEFORGOTTEN", 16)
+local PLAYER_THESOUL = enum(PlayerType, "PLAYER_THESOUL", 17)
+
+local function otherFormInfo(p)
+  local t = try(function() return p:GetPlayerType() end)
+  if t ~= PLAYER_THEFORGOTTEN and t ~= PLAYER_THESOUL then return nil end
+  local sub = try(function() return p:GetSubPlayer() end)
+  if not sub then return nil end
+  return { type = try(function() return sub:GetPlayerType() end), health = healthInfo(sub) }
+end
+
 local function playerInfo(i, p, curses)
   local healthHidden = curses & K.CURSE_UNKNOWN ~= 0
   local t = {
@@ -785,12 +817,14 @@ local function playerInfo(i, p, curses)
     forms = formsInfo(p),
     bag = try(function() return bagInfo(i, p) end),
   }
+  t.poops = try(function() return poopsInfo(p) end)
   if healthHidden then
     t.health = { hidden = true }
     t.shields = {}
   else
     t.health = healthInfo(p)
     t.shields = shieldsInfo(p)
+    t.otherForm = try(function() return otherFormInfo(p) end)
   end
   return t
 end
@@ -885,6 +919,7 @@ local function buildState()
     inRun = run.inRun,
     paused = try(function() return game:IsPaused() end) == true,
     strings = stringCount, -- 0 means the app should send POST /strings
+    hudHidden = SchoolbagHudHidden == true, -- the mod is hiding the game's HUD
   }
   if not run.inRun then return s end
 
@@ -976,6 +1011,7 @@ local lastPoll = nil -- Isaac.GetFrameCount() of the app's last /state request
 local function handle(client)
   local method, path, body, length = readRequest(client)
   if not method then return end
+  local query = path:match("%?(.*)$") or ""
   path = path:gsub("%?.*$", "")
   if method == "POST" and path == "/strings" then
     if length > MAX_BODY then
@@ -991,7 +1027,13 @@ local function handle(client)
   elseif method ~= "GET" then
     respond(client, "405 Method Not Allowed", "text/plain", "GET, or POST /strings")
   elseif path == "/state" then
-    lastPoll = Isaac.GetFrameCount() -- the app is watching: see "The game's own HUD"
+    -- the app is watching: see "The game's own HUD". With ?hud=keep (the app's
+    -- "Hide the game's HUD" setting off) it reads without hiding anything.
+    if query:find("hud=keep", 1, true) then
+      lastPoll = nil
+    else
+      lastPoll = Isaac.GetFrameCount()
+    end
     local ok, body = pcall(function() return json.encode(buildState()) end)
     if ok then
       respond(client, "200 OK", "application/json", body)

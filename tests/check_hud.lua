@@ -48,6 +48,14 @@ check(not visible(), "HUD hidden as soon as the app reads the run")
 for _ = 1, 20 do frames(6) poll() end -- ten reads a second for two seconds
 check(not visible(), "stays hidden while the app keeps reading")
 
+poll("/state?hud=keep")
+frames(1)
+check(visible(), "the app's setting off (?hud=keep): the HUD comes straight back")
+for _ = 1, 10 do frames(6) poll("/state?hud=keep") end
+check(visible(), "and stays while the app keeps reading that way")
+poll()
+check(not visible(), "the setting back on: hidden again")
+
 W.hudVisible = true -- the game turns its HUD back on by itself
 frames(1)
 check(not visible(), "hidden again if the game switches it back on")

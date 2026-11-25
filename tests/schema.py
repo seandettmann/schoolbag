@@ -19,6 +19,8 @@ def validate(s):
     need(s, "inRun", bool, "state")
     need(s, "paused", bool, "state")
     need(s, "strings", int, "state")  # how many of the game's words the app has sent
+    if "hudHidden" in s and not isinstance(s["hudHidden"], bool):
+        errs.append("state.hudHidden is not a bool")
     if not s.get("inRun"):
         return errs
     for key in ("run", "floor", "map", "room", "death"):
@@ -64,6 +66,14 @@ def validate(s):
         for pk in p.get("pockets") or []:
             if pk.get("kind") == "pill" and not pk.get("identified") and "effect" in pk:
                 errs.append("unidentified pill leaks its effect")
+        if "poops" in p:  # Tainted ??? only
+            if not _is_list(p["poops"].get("queue")) or any(not isinstance(x, int) for x in p["poops"]["queue"] or []):
+                errs.append("poops.queue not a list of numbers")
+        if "otherForm" in p:  # The Forgotten / The Soul only
+            if p.get("health", {}).get("hidden"):
+                errs.append("hidden health leaks the other form")
+            need(p["otherForm"], "type", int, "otherForm")
+            need(p["otherForm"], "health", dict, "otherForm")
         if "bag" in p:  # only while the player holds the Bag of Crafting
             bag = p["bag"]
             if not isinstance(bag, dict):
