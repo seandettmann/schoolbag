@@ -84,9 +84,13 @@ folder, launch with `--luadebug`, start a run and open
 `http://127.0.0.1:8089/state` in a browser. The game's `log.txt` shows lines
 starting with `[Schoolbag]`.
 
-**Uploading to the Workshop:** run the game's `tools/ModUploader/ModUploader.exe`
-on the `mods/schoolbag` folder. Upload as private first, test on the Thor, then
-make it public.
+**Uploading to the Workshop (Windows):** copy `mod/schoolbag` into the game's
+`mods` folder, run the game's `tools/ModUploader/ModUploader.exe` and choose
+that folder's `metadata.xml`. It goes up as **private** (`metadata.xml` says
+so), which is enough to subscribe on your own account and let GameNative
+install it on the Thor. For updates, run the uploader again on the same folder.
+Switch the item to public on its Workshop page at release. `mod/preview.png`
+is a placeholder thumbnail (no game art) if the uploader asks for one.
 
 ## License
 
