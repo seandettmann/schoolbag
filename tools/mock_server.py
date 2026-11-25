@@ -55,7 +55,7 @@ def base_map():
             })
             if ch == "T":
                 current = index
-    return {"hidden": False, "width": 13, "current": current, "rooms": rooms}
+    return {"hidden": False, "mirrored": False, "width": 13, "current": current, "rooms": rooms}
 
 
 def base_player():
@@ -118,7 +118,7 @@ def scenario(name):
         s["paused"] = True
     elif name == "lost":
         s["floor"]["curses"] = 4
-        s["map"] = {"hidden": True, "hiddenReason": "lost", "width": 13, "current": 58, "rooms": []}
+        s["map"] = {"hidden": True, "hiddenReason": "lost", "mirrored": False, "width": 13, "current": 58, "rooms": []}
     elif name == "unknown":
         s["floor"]["curses"] = 8
         p["health"] = {"hidden": True}
@@ -185,6 +185,10 @@ def scenario(name):
         p["actives"].append({"slot": 2, "id": 710, "name": "#BAG_OF_CRAFTING_NAME", "charge": 0,
                              "maxCharge": 0, "chargeType": 0, "battery": 0})
         p["bag"] = {"items": [8, 8, 1, 12, 15, 2, 22, 21], "sure": True}
+    elif name == "mirror":
+        # Downpour II's mirror world: the app flips the map
+        s["floor"].update({"stage": 4, "stageType": 1, "name": "Downpour II", "curses": 0})
+        s["map"]["mirrored"] = True
     elif name == "tbluebaby":
         # Tainted ???: 2 poops to place; the queue shows what comes next (PoopSpellType)
         p["type"], p["name"] = 25, "???"
@@ -208,7 +212,7 @@ def scenario(name):
 SCENARIOS = ["normal", "notinrun", "offline", "paused", "lost", "unknown", "blind", "loading",
              "dead", "active0", "active1", "greed", "challenge", "shields", "shieldsall",
              "bossrush", "hush", "devil", "emptyroom", "newitem", "pills", "tcain",
-             "tbluebaby", "forgotten"]
+             "tbluebaby", "forgotten", "mirror"]
 
 
 class Handler(BaseHTTPRequestHandler):

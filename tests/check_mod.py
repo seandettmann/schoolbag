@@ -144,6 +144,13 @@ try:
     step("uncursed")
     step("plain")
 
+    print("mirror world")
+    check(s["map"].get("mirrored") is False, "map.mirrored is false outside the mirror world")
+    step("mirror")
+    s, _ = state()
+    check(s["map"].get("mirrored") is True, "map.mirrored is true in the mirror world")
+    step("unmirror")
+
     print("the /watch test page")
     status, headers, body = get("/watch")
     check(status == 200 and "text/html" in headers.get("Content-Type", "") and "fetch(\"/state\"" in body,

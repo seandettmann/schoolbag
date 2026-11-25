@@ -61,6 +61,8 @@ function S.forgotten() -- The Forgotten in control; The Soul holds 2 and a half 
   PLAYER.GetSubPlayer = function() return soul end
 end
 function S.plain() W.playerType = 0 end
+function S.mirror() W.mirror = true end
+function S.unmirror() W.mirror = false end
 
 local stop = socket.gettime() + 60
 while socket.gettime() < stop do

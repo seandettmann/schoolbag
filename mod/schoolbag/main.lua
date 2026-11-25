@@ -558,6 +558,8 @@ local function mapInfo(level, curses)
   local current = level:GetCurrentRoomDesc()
   local currentIndex = current and current.SafeGridIndex or level:GetCurrentRoomIndex()
   local m = { width = 13, current = currentIndex, rooms = {} }
+  -- the mirror world (Downpour II / Dross II): the app flips the map, as the game does
+  m.mirrored = try(function() return game:GetRoom():IsMirrorWorld() end) == true
   if curses & K.CURSE_LOST ~= 0 then
     m.hidden = true
     m.hiddenReason = "lost"
@@ -1045,7 +1047,7 @@ function lines(s) {
   if (!s.inRun) return out;
   var f = s.floor || {};
   out.push("floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
-    (s.transition ? ", leaving by " + s.transition : ""));
+    (s.map && s.map.mirrored ? ", MIRROR WORLD" : "") + (s.transition ? ", leaving by " + s.transition : ""));
   (s.players || []).forEach(function (p) {
     var k = p.pickups || {};
     out.push("");

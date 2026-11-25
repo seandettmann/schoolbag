@@ -32,6 +32,8 @@ def validate(s):
     for k in ("stage", "stageType", "curses"):
         need(s["floor"], k, int, "floor")
     need(s["map"], "hidden", bool, "map")
+    if "mirrored" in s["map"] and not isinstance(s["map"]["mirrored"], bool):
+        errs.append("map.mirrored is not a bool")
     if not _is_list(s["map"].get("rooms")):
         errs.append("map.rooms not a list")
     for r in s["map"].get("rooms") or []:

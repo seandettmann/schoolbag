@@ -183,6 +183,7 @@ local level = {
 local room = {
   GetType = function() return W.roomType end,
   GetDevilRoomChance = function() return 0.3333333 end,
+  IsMirrorWorld = function() return W.mirror == true end,
 }
 
 local pool = {

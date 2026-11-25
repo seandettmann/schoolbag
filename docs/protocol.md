@@ -184,6 +184,7 @@ The mod never sends what the game is hiding from the player:
 |---|---|
 | `hidden` | `true` under Curse of the Lost. |
 | `hiddenReason` | `"lost"` when hidden by the curse. |
+| `mirrored` | `true` in the mirror world (Downpour II / Dross II). The app flips the map left to right, as the game does. |
 | `width` | Grid width (13). Room `index` = `y * width + x`. |
 | `current` | Grid index of the room the player is in. |
 | `rooms[].index` | The room's grid index (top-left cell for big rooms). |
