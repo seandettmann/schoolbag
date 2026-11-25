@@ -1,0 +1,11 @@
+# Game art never goes in this repository
+art/
+app/art/
+extracted_resources/
+*.apk
+*.aab
+
+# Python / tooling
+__pycache__/
+*.pyc
+.DS_Store
