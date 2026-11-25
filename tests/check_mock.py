@@ -22,6 +22,13 @@ try:
         errs = validate(s)
         print(("  ok   " if not errs else "  FAIL ") + name + ("" if not errs else f": {errs}"))
         bad += bool(errs)
+    # the app sends the game's words for the banners; the count shows up in /state
+    urllib.request.urlopen(f"{BASE}/scenario/normal").read()
+    req = urllib.request.Request(BASE + "/strings", data=json.dumps({"THE_SAD_ONION_NAME": "The Sad Onion"}).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    ok = urllib.request.urlopen(req).read() == b"ok 1" and json.load(urllib.request.urlopen(BASE + "/state"))["strings"] == 1
+    print(("  ok   " if ok else "  FAIL ") + "POST /strings")
+    bad += not ok
 finally:
     srv.terminate()
 print("ALL PASSED" if not bad else f"{bad} FAILED")

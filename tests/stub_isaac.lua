@@ -241,6 +241,11 @@ function game:IsGreedMode() return W.greed end
 function game:GetGreedWavesNum() return 11 end
 function game:GetItemPool() return pool end
 function game:GetFrameCount() return W.frame end
+-- the game's own HUD on the main screen
+local hud = {}
+function hud:IsVisible() return W.hudVisible ~= false end
+function hud:SetVisible(v) W.hudVisible = v W.hudSets = (W.hudSets or 0) + 1 end
+function game:GetHUD() return hud end
 
 function Game() return game end
 
@@ -257,6 +262,7 @@ Isaac = {
     end
     return out
   end,
+  GetFrameCount = function() return W.render or 0 end, -- render frames, 60 a second, run while paused
   DebugString = function(s) io.stderr:write(s, "\n") end,
   RenderText = function() end,
 }

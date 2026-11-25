@@ -18,7 +18,11 @@ There are two pieces, both called Schoolbag:
 | **App** (`app/`, coming next) | Draws the HUD on the bottom screen. | GitHub Releases, through Obtainium |
 
 The mod answers on `http://127.0.0.1:8089` (loopback only). The app asks it
-for the current state about ten times a second. The format is in
+for the current state about ten times a second. While the app is reading, the
+mod hides the game's own HUD on the main screen, like isaac-hud; it comes back
+a few seconds after the app stops. Unlike isaac-hud, nothing goes missing: the
+mod redraws the game's floor, item, pill and card banners and the boss health
+bar itself, with the game's own art and the game's words sent over by the app. The format is in
 [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
@@ -61,7 +65,9 @@ dual-screen companion for the Eden Duo.
 
 ```
 docs/protocol.md        what the mod sends (protocol 1)
-mod/schoolbag/          the Workshop mod: main.lua + metadata.xml
+mod/schoolbag/          the Workshop mod: main.lua + metadata.xml, and resources/ with
+                        the boss bar's animation file (it points at the game's own image)
+tools/make_bossbar_anm2.py  writes that animation file
 tools/mock_server.py    a fake mod with scenarios, for building the app without the game
 tests/                  runs the real mod against a stubbed game API, and checks the fake
 ```
@@ -77,6 +83,8 @@ Add `--host 0.0.0.0` to reach it from another device on your Wi-Fi.
 python3 tests/check_mod.py    # the real mod, stubbed game, real HTTP
 python3 tests/check_mock.py   # every fake-mod scenario against the protocol
 lua5.3 tests/check_reminder.lua  # the "Schoolbag is offline" banner
+lua5.3 tests/check_hud.lua       # hiding the game's HUD while the app reads
+lua5.3 tests/check_banners.lua   # the banners and boss bar drawn in the HUD's place
 ```
 
 **Trying the mod on a PC:** copy `mod/schoolbag` into the game's `mods`

@@ -6,6 +6,9 @@
 -- lets a mod load LuaSocket. Without it, the mod shows a short reminder at the
 -- start of each run, drawn like the game's own item banner, that stays up for
 -- the whole run, and does nothing else.
+--
+-- While the app is reading the run, the mod hides the game's own HUD on the
+-- main screen; it comes back a few seconds after the app stops.
 
 local mod = RegisterMod("Schoolbag", 1)
 
@@ -53,6 +56,11 @@ local function log(msg)
   Isaac.DebugString("[Schoolbag] " .. tostring(msg))
 end
 
+local logged = {}
+local function logOnce(msg) -- for things that could otherwise repeat every frame
+  if not logged[msg] then logged[msg] = true log(msg) end
+end
+
 local K = {
   -- items and trinkets
   HOLY_MANTLE    = enum(CollectibleType, "COLLECTIBLE_HOLY_MANTLE", 313),
@@ -63,6 +71,7 @@ local K = {
   GOLDEN_TRINKET = enum(TrinketType, "TRINKET_GOLDEN_FLAG", 32768),
   HORSE_PILL     = enum(PillColor, "PILL_GIANT_FLAG", 2048),
   -- curses (bit flags)
+  CURSE_LABYRINTH = enum(LevelCurse, "CURSE_OF_LABYRINTH", 2),
   CURSE_LOST     = enum(LevelCurse, "CURSE_OF_THE_LOST", 4),
   CURSE_UNKNOWN  = enum(LevelCurse, "CURSE_OF_THE_UNKNOWN", 8),
   CURSE_BLIND    = enum(LevelCurse, "CURSE_OF_BLIND", 64),
@@ -511,12 +520,65 @@ local function section(name, fn)
   return nil
 end
 
+------------------------------------------------------------------------------
+-- The game's words, from the app
+------------------------------------------------------------------------------
+-- The game hands mods codes like "#THE_SAD_ONION_NAME", not the words, and
+-- the words live in a game file mods can't open. The app has them (they're
+-- bundled with its art), so it sends them with POST /strings; the mod needs
+-- them only for the banners it draws while the game's HUD is hidden, which is
+-- only while the app is running. Kept in a global so a mod reload keeps them.
+
+SchoolbagStrings = SchoolbagStrings or {}
+local strings = SchoolbagStrings
+local stringCount = 0
+for _ in pairs(strings) do stringCount = stringCount + 1 end
+
+local SMALL_WORDS = { ["of"] = true, ["the"] = true, ["a"] = true, ["an"] = true, ["and"] = true,
+  ["to"] = true, ["in"] = true, ["on"] = true, ["for"] = true }
+
+-- The readable text for one of the game's codes; codes the app hasn't sent
+-- yet are turned into words ("#THE_SAD_ONION_NAME" -> "The Sad Onion") as a
+-- stand-in. Names that aren't codes (modded items) come back as they are.
+local function readable(code)
+  if type(code) ~= "string" or code == "" then return nil end
+  if code:sub(1, 1) ~= "#" then return code end
+  local key = code:sub(2)
+  if strings[key] then return strings[key] end
+  local base = key:match("^(.*)_NAME$")
+  if not base then return nil end
+  local words, first = {}, true
+  for w in base:lower():gmatch("[^_]+") do
+    if first or not SMALL_WORDS[w] then w = w:sub(1, 1):upper() .. w:sub(2) end
+    words[#words + 1] = w
+    first = false
+  end
+  return table.concat(words, " ")
+end
+
+-- POST /strings: a JSON object of the game's string keys (without the "#")
+-- and their text, in whatever language the app uses. Merged into what's there.
+local function takeStrings(body)
+  local ok, data = pcall(json.decode, body)
+  if not ok or type(data) ~= "table" then return nil end
+  local n = 0
+  for k, v in pairs(data) do
+    if type(k) == "string" and type(v) == "string" then
+      if strings[k] == nil then stringCount = stringCount + 1 end
+      strings[k] = v
+      n = n + 1
+    end
+  end
+  return n
+end
+
 local function buildState()
   local s = {
     protocol = PROTOCOL,
     mod = { name = "Schoolbag", version = VERSION },
     inRun = run.inRun,
     paused = try(function() return game:IsPaused() end) == true,
+    strings = stringCount, -- 0 means the app should send POST /strings
   }
   if not run.inRun then return s end
 
@@ -567,16 +629,26 @@ local function startServer(quiet)
   log("listening on http://" .. HOST .. ":" .. PORT)
 end
 
+local MAX_BODY = 4 * 1024 * 1024 -- the app's strings are well under this
+
 local function readRequest(client)
   client:settimeout(0.02)
   local line = client:receive("*l")
   if not line then return nil end
   local method, path = line:match("^(%u+)%s+(%S+)")
-  for _ = 1, 50 do -- skip the headers
+  local length = 0
+  for _ = 1, 50 do -- the headers; only the body's length matters
     local h = client:receive("*l")
     if not h or h == "" then break end
+    local n = h:lower():match("^content%-length:%s*(%d+)")
+    if n then length = tonumber(n) end
   end
-  return method, path
+  local body
+  if length > 0 and length <= MAX_BODY then
+    client:settimeout(1)
+    body = client:receive(length)
+  end
+  return method, path, body, length
 end
 
 local function respond(client, status, contentType, body)
@@ -593,13 +665,27 @@ local function respond(client, status, contentType, body)
   client:send(head .. body)
 end
 
+local lastPoll = nil -- Isaac.GetFrameCount() of the app's last /state request
+
 local function handle(client)
-  local method, path = readRequest(client)
+  local method, path, body, length = readRequest(client)
   if not method then return end
   path = path:gsub("%?.*$", "")
-  if method ~= "GET" then
-    respond(client, "405 Method Not Allowed", "text/plain", "GET only")
+  if method == "POST" and path == "/strings" then
+    if length > MAX_BODY then
+      respond(client, "413 Payload Too Large", "text/plain", "too big")
+      return
+    end
+    local n = body and takeStrings(body)
+    if n then
+      respond(client, "200 OK", "text/plain", "ok " .. n)
+    else
+      respond(client, "400 Bad Request", "text/plain", "expected a JSON object of strings")
+    end
+  elseif method ~= "GET" then
+    respond(client, "405 Method Not Allowed", "text/plain", "GET, or POST /strings")
   elseif path == "/state" then
+    lastPoll = Isaac.GetFrameCount() -- the app is watching: see "The game's own HUD"
     local ok, body = pcall(function() return json.encode(buildState()) end)
     if ok then
       respond(client, "200 OK", "application/json", body)
@@ -622,6 +708,40 @@ local function serve()
     local ok, err = pcall(handle, client)
     if not ok then log("request failed: " .. tostring(err)) end
     pcall(function() client:close() end)
+  end
+end
+
+------------------------------------------------------------------------------
+-- The game's own HUD
+------------------------------------------------------------------------------
+-- While the app is showing the HUD on the other screen, the game's own HUD is
+-- hidden on the main screen, like isaac-hud does. It comes back by itself a
+-- few seconds after the app stops asking, so closing the app or turning the
+-- bottom screen off never leaves you without a HUD.
+
+local HUD_GRACE = 3 * 60 -- render frames (60 a second) with no request before the HUD returns
+-- kept in a global so a mod reload still knows it hid the HUD
+SchoolbagHudHidden = SchoolbagHudHidden or false
+
+local function appWatching()
+  return lastPoll ~= nil and Isaac.GetFrameCount() - lastPoll < HUD_GRACE
+end
+
+local function setGameHud(visible)
+  local hud = try(function() return game:GetHUD() end)
+  if not hud then return end
+  -- checked every frame: the game can switch its HUD back on by itself
+  if try(function() return hud:IsVisible() end) ~= visible then
+    try(function() hud:SetVisible(visible) end)
+  end
+  SchoolbagHudHidden = not visible
+end
+
+local function updateGameHud()
+  if run.inRun and appWatching() then
+    setGameHud(false)
+  elseif SchoolbagHudHidden then
+    setGameHud(true)
   end
 end
 
@@ -782,6 +902,159 @@ local function retryBind()
 end
 
 ------------------------------------------------------------------------------
+-- The game's banners and boss bar, while its HUD is hidden
+------------------------------------------------------------------------------
+-- Hiding the game's HUD also hides the banners it shows for a new floor (with
+-- its curse), a picked-up item, a pill or a card, and the boss health bar.
+-- While Schoolbag has the HUD hidden, the mod draws them itself with the
+-- game's own art, in the same place and with the same timing. Each banner is
+-- followed from the moment the game would have started it, so if the HUD is
+-- hidden partway through, ours carries on where the game's stopped.
+
+local BANNER_FRAMES = 70 -- the game's "Text" streak animation
+local WORDS_FROM, WORDS_TO = 8, 61 -- frames where the streak is still and the words show
+local banner = nil -- { title, detail, t0 }
+
+local FLOOR_PAIRS = { -- stage types: 0 normal, 1 and 2 alternates, 4 and 5 the Repentance path
+  { [0] = "BASEMENT", [1] = "CELLAR", [2] = "BURNING_BASEMENT", [4] = "DOWNPOUR", [5] = "DROSS" },
+  { [0] = "CAVES", [1] = "CATACOMBS", [2] = "FLOODED_CAVES", [4] = "MINES", [5] = "ASHPIT" },
+  { [0] = "DEPTHS", [1] = "NECROPOLIS", [2] = "DANK_DEPTHS", [4] = "MAUSOLEUM", [5] = "GEHENNA" },
+  { [0] = "WOMB", [1] = "UTERO", [2] = "SCARRED_WOMB", [4] = "CORPSE", [5] = "CORPSE" },
+}
+local LATE_FLOORS = { [9] = { [0] = "BLUE_WOMB" }, [10] = { [0] = "SHEOL", [1] = "CATHEDRAL" },
+  [11] = { [0] = "DARK_ROOM", [1] = "CHEST" }, [12] = { [0] = "THE_VOID" }, [13] = { [0] = "HOME" } }
+local GREED_LATE = { [5] = "SHEOL", [6] = "THE_SHOP", [7] = "ULTRA_GREED" }
+local CURSE_NAMES = { { 1, "CURSE_OF_DARKNESS" }, { 2, "CURSE_OF_THE_LABYRINTH" }, { 4, "CURSE_OF_THE_LOST" },
+  { 8, "CURSE_OF_THE_UNKNOWN" }, { 16, "CURSE_OF_THE_CURSED" }, { 32, "CURSE_OF_THE_MAZE" },
+  { 64, "CURSE_OF_THE_BLIND" }, { 128, "CURSE_OF_THE_GIANT" } }
+
+-- "Basement I", "Caves XL", "Sheol": the floor name the game's banner shows
+local function floorTitle(level)
+  local stage, stageType = level:GetStage(), level:GetStageType()
+  local key, numeral
+  if try(function() return game:IsGreedMode() end) then
+    key = (FLOOR_PAIRS[stage] or {})[stageType] or GREED_LATE[stage]
+  elseif stage >= 1 and stage <= 8 then
+    key = (FLOOR_PAIRS[math.ceil(stage / 2)] or {})[stageType]
+    if level:GetCurses() & K.CURSE_LABYRINTH ~= 0 then
+      numeral = "XL"
+    else
+      numeral = stage % 2 == 1 and "I" or "II"
+    end
+  else
+    local t = LATE_FLOORS[stage]
+    key = t and (t[stageType] or t[0])
+  end
+  local name = key and readable("#" .. key .. "_NAME")
+  if not name then -- a floor we don't know: whatever the game calls it
+    name = readable(try(function() return level:GetName() end))
+    numeral = nil
+  end
+  if name and numeral then name = name .. " " .. numeral end
+  return name
+end
+
+local function curseTitle(level)
+  local curses = level:GetCurses()
+  if curses == 0 then return nil end
+  for _, c in ipairs(CURSE_NAMES) do
+    if curses & c[1] ~= 0 then return readable("#" .. c[2] .. "_NAME") end
+  end
+  return readable(try(function() return level:GetCurseName() end))
+end
+
+local function showBanner(title, detail)
+  if not title or title == "" then return end
+  banner = { title = title, detail = detail ~= "" and detail or nil, t0 = now() }
+end
+
+-- An item held overhead is the moment the game shows its name.
+local heldItem = {} -- per player: "type:id" of the item held overhead, if any
+local function watchPickups()
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    local item = p and try(function() return p.QueuedItem.Item end)
+    local id = item and try(function() return tostring(item.Type) .. ":" .. tostring(item.ID) end)
+    if id and id ~= heldItem[i] then
+      showBanner(readable(try(function() return item.Name end)), readable(try(function() return item.Description end)))
+    end
+    heldItem[i] = id
+  end
+end
+
+local function drawBanner()
+  local k = now() - banner.t0
+  if k < 0 or k >= BANNER_FRAMES then banner = nil return end
+  if game:IsPaused() then return end
+  local art = reminderArt()
+  local x, y = Isaac.GetScreenWidth() / 2, REMIND_Y
+  local words = k >= WORDS_FROM and k <= WORDS_TO
+  if not (art.streak and art.title and art.detail) then
+    if words then -- the game's art or fonts couldn't be found: plain text instead
+      local line = banner.title .. (banner.detail and (": " .. banner.detail) or "")
+      local w = try(function() return Isaac.GetTextWidth(line) end) or 0
+      Isaac.RenderText(line, x - w / 2, y - 6, 1, 1, 1, 1)
+    end
+    return
+  end
+  local zero = Vector(0, 0)
+  art.streak:SetFrame("Text", k)
+  if banner.detail then
+    art.streak:Render(Vector(x, y), zero, zero) -- the ink and its paper strip
+  elseif not pcall(art.streak.RenderLayer, art.streak, 0, Vector(x, y), zero, zero) then
+    art.streak:Render(Vector(x, y), zero, zero)
+  end
+  if words then
+    art.title:DrawString(banner.title, x - 200, y - 13, KColor(1, 1, 1, 1), 400, true)
+    if banner.detail then
+      art.detail:DrawString(banner.detail, x - 84, y + PAPER_TOP + DETAIL_DY, KColor(INK[1], INK[2], INK[3], 1), 168, true)
+    end
+  end
+end
+
+-- The boss bar: every boss in the room added together, as the game does.
+local BOSSBAR_FILL = 110 -- columns in the bar's fill (frames 0-110 of "Fill")
+local BOSSBAR_FROM_BOTTOM = 22
+local boss = { hp = 0, max = 0, flashUntil = 0 }
+local bossBar = nil
+
+local function scanBosses()
+  local hp, max = 0, 0
+  for _, e in ipairs(Isaac.GetRoomEntities()) do
+    if e:IsBoss() and not e:IsDead() and e.MaxHitPoints > 0
+        and not try(function() return e:HasEntityFlags(EntityFlag.FLAG_FRIENDLY) end) then
+      hp = hp + math.max(0, e.HitPoints)
+      max = max + e.MaxHitPoints
+    end
+  end
+  if boss.max > 0 and hp < boss.hp then boss.flashUntil = now() + 2 end -- a hit flashes the bar
+  boss.hp, boss.max = hp, max
+end
+
+local function drawBossBar()
+  if boss.max <= 0 or boss.hp <= 0 or game:IsPaused() then return end
+  if bossBar == nil then bossBar = loadSprite("gfx/ui/schoolbag_bossbar.anm2") or false end
+  if not bossBar then return end
+  local pos = Vector(Isaac.GetScreenWidth() / 2, Isaac.GetScreenHeight() - BOSSBAR_FROM_BOTTOM)
+  local zero = Vector(0, 0)
+  bossBar:SetFrame("Back", 0)
+  bossBar:Render(pos, zero, zero)
+  local k = math.floor(boss.hp / boss.max * BOSSBAR_FILL + 0.5)
+  k = math.max(1, math.min(BOSSBAR_FILL, k))
+  bossBar:SetFrame(now() < boss.flashUntil and "FillHit" or "Fill", k)
+  bossBar:Render(pos, zero, zero)
+end
+
+local function drawStandIns()
+  if banner then
+    local ok, err = pcall(drawBanner)
+    if not ok then banner = nil logOnce("couldn't draw a banner: " .. tostring(err)) end
+  end
+  local ok, err = pcall(drawBossBar)
+  if not ok then boss.max = 0 logOnce("couldn't draw the boss bar: " .. tostring(err)) end
+end
+
+------------------------------------------------------------------------------
 -- Callbacks
 ------------------------------------------------------------------------------
 
@@ -804,6 +1077,7 @@ mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function(_, shouldSave)
   if shouldSave then saveRun() end
   run.inRun = false
   remind.phase, remind.resumeAt = nil, nil
+  if SchoolbagHudHidden then setGameHud(true) end
 end)
 
 mod:AddCallback(ModCallbacks.MC_POST_GAME_END, function(_, isGameOver)
@@ -815,11 +1089,21 @@ end)
 mod:AddCallback(ModCallbacks.MC_POST_NEW_LEVEL, function()
   if run.inRun then saveRun() end
   reminderStepAside() -- the game shows the floor name where our banner sits
+  pcall(function()
+    local level = game:GetLevel()
+    showBanner(floorTitle(level), curseTitle(level))
+  end)
 end)
 
 -- The game also uses that spot for item, pill and card names.
-mod:AddCallback(ModCallbacks.MC_USE_PILL, function() reminderStepAside() end)
-mod:AddCallback(ModCallbacks.MC_USE_CARD, function() reminderStepAside() end)
+mod:AddCallback(ModCallbacks.MC_USE_PILL, function(_, effect)
+  reminderStepAside()
+  pcall(function() showBanner(readable(Isaac.GetItemConfig():GetPillEffect(effect).Name)) end)
+end)
+mod:AddCallback(ModCallbacks.MC_USE_CARD, function(_, card)
+  reminderStepAside()
+  pcall(function() showBanner(readable(Isaac.GetItemConfig():GetCard(card).Name)) end)
+end)
 
 mod:AddCallback(ModCallbacks.MC_POST_UPDATE, function()
   if game:GetFrameCount() % SCAN_EVERY == 0 then scanAllPlayers() end
@@ -834,7 +1118,13 @@ mod:AddCallback(ModCallbacks.MC_POST_UPDATE, function()
       end
     end
   end
-  if run.inRun then retryBind() end
+  if run.inRun then
+    retryBind()
+    local ok, err = pcall(watchPickups)
+    if not ok then logOnce("couldn't watch pickups: " .. tostring(err)) end
+    ok, err = pcall(scanBosses)
+    if not ok then boss.max = 0 end
+  end
 end)
 
 mod:AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, function(_, entity, amount, flags, source)
@@ -866,6 +1156,8 @@ mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
     end
   end
   serve()
+  updateGameHud()
+  if SchoolbagHudHidden and run.inRun then drawStandIns() end
   if remind.phase and run.inRun then
     local ok, err = pcall(drawReminder)
     if not ok then

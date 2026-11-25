@@ -18,6 +18,7 @@ def validate(s):
     need(s, "protocol", int, "state")
     need(s, "inRun", bool, "state")
     need(s, "paused", bool, "state")
+    need(s, "strings", int, "state")  # how many of the game's words the app has sent
     if not s.get("inRun"):
         return errs
     for key in ("run", "floor", "map", "room", "death"):

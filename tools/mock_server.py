@@ -192,6 +192,7 @@ SCENARIOS = ["normal", "notinrun", "offline", "paused", "lost", "unknown", "blin
 class Handler(BaseHTTPRequestHandler):
     current = "normal"
     started = time.time()
+    strings = {}  # what the app sent with POST /strings
 
     def log_message(self, fmt, *args):  # keep the console quiet
         pass
@@ -228,10 +229,32 @@ class Handler(BaseHTTPRequestHandler):
         if path != "/state":
             return self.send(404, "not found", "text/plain")
         state = scenario(Handler.current)
+        state["strings"] = len(Handler.strings)
         if state.get("inRun") and state.get("run") and not state.get("paused"):
             # the run clock keeps ticking (30 frames per second)
             state["run"]["timeFrames"] += int((time.time() - Handler.started) * 30)
         self.send(200, json.dumps(state))
+
+
+    def do_POST(self):
+        # like the mod: the app sends the game's words for the banners
+        path = self.path.split("?")[0]
+        if Handler.current == "offline":
+            self.close_connection = True
+            return
+        if path != "/strings":
+            return self.send(405, "GET, or POST /strings", "text/plain")
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            data = json.loads(self.rfile.read(length) or b"null")
+        except ValueError:
+            data = None
+        if not isinstance(data, dict):
+            return self.send(400, "expected a JSON object of strings", "text/plain")
+        got = {k: v for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
+        Handler.strings.update(got)
+        print(f"strings: got {len(got)}, {len(Handler.strings)} in all")
+        return self.send(200, f"ok {len(got)}", "text/plain")
 
 
 def main():

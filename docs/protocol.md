@@ -2,7 +2,9 @@
 
 The Schoolbag mod runs inside The Binding of Isaac: Repentance+ and answers HTTP
 requests on **`http://127.0.0.1:8089`**. The Schoolbag app polls it and draws
-the bottom-screen HUD. Nothing is ever sent back to the game.
+the bottom-screen HUD. Reading hides the game's own HUD while the app is
+watching (below), and the app sends the mod one thing: the game's words for the
+banners the mod draws in the HUD's place (`POST /strings`).
 
 Port 8089 was picked so Schoolbag can run alongside hud-stream (isaac-hud's mod,
 which uses 8088). The server only listens on the loopback address.
@@ -12,7 +14,8 @@ which uses 8088). The server only listens on the loopback address.
 | Path | Answer |
 |---|---|
 | `GET /state` | The full state below, as JSON. |
-| `GET /health` | `ok` (plain text). Cheap check that the mod is up. |
+| `GET /health` | `ok` (plain text). Cheap check that the mod is up. Doesn't hide the HUD. |
+| `POST /strings` | The game's words, from the app (below). Answers `ok <count>`, or `400` if the body isn't a JSON object. |
 | anything else | `404`. |
 
 Every response has `Connection: close` and `Access-Control-Allow-Origin: *`.
@@ -26,6 +29,41 @@ into each run it keeps a banner up in the style of the game's own banners,
 "Schoolbag is offline", with "Needs --luadebug" (or "Port 8089 is busy") on
 the paper strip under it. It uses the game's own banner sprite and fonts and
 steps aside whenever the game shows a banner of its own in the same spot.
+
+**The game's own HUD:** while `/state` is being read, the mod hides the game's
+HUD on the main screen (as isaac-hud does), since the app shows it on the other
+screen. It comes back by itself 3 seconds after the last `/state` read, when
+the run ends, and on the menus, so a closed app or a switched-off bottom
+screen never leaves the player without a HUD. Reading while paused keeps it
+hidden.
+
+**What the mod draws while the HUD is hidden:** hiding the game's HUD also hides
+the banners it shows for a new floor (with its curse on the paper strip), a
+picked-up item (with its one-line description), a pill and a card, and the
+boss health bar. While the HUD is hidden, the mod draws these itself on the
+main screen with the game's own art, in the same places and with the same
+timing. If the HUD is hidden partway through a banner, the mod's carries on
+from the same frame. When the HUD is showing, the game draws its own and the
+mod draws nothing.
+
+**`POST /strings`, the game's words:** the game gives mods codes such as
+`#THE_SAD_ONION_NAME`, not the words, and the words are in a game file mods
+can't open. The app has them (from `stringtable.sta`, bundled with its art), so
+it sends them: a JSON object of string keys **without the `#`** and their text,
+in the language the app uses.
+
+```json
+{ "THE_SAD_ONION_NAME": "The Sad Onion", "THE_SAD_ONION_DESCRIPTION": "Tears up",
+  "BASEMENT_NAME": "Basement", "CURSE_OF_THE_BLIND_NAME": "Curse of the Blind!" }
+```
+
+- Send the `Items`, `PocketItems`, `Stages` and `Curses` categories (about 2,100
+  strings). Sending more is harmless; repeats replace earlier text.
+- `/state` has `strings`, the number the mod holds. Send them whenever it's 0:
+  on first connect, and again after the game restarts. A mod reload keeps them.
+- Until they arrive, the mod makes do: names become words from their codes
+  (`#MOMS_KNIFE_NAME` → "Moms Knife") and descriptions are left off.
+- Floor numbers ("I", "II", "XL") are added by the mod, as the game does.
 
 **Polling:** about 10 times a second is plenty. The mod builds the state on
 request, so it costs nothing when the app isn't running.
@@ -76,6 +114,7 @@ The mod never sends what the game is hiding from the player:
   "mod": { "name": "Schoolbag", "version": "0.1.0" },
   "inRun": true,
   "paused": false,
+  "strings": 2104,
   "run": { ... },
   "floor": { ... },
   "map": { ... },
@@ -90,6 +129,7 @@ The mod never sends what the game is hiding from the player:
 | Field | Meaning |
 |---|---|
 | `inRun` | `true` while a run is going. |
+| `strings` | How many of the game's words the app has sent with `POST /strings`. 0 means send them. |
 | `paused` | The game is on its pause screen. The mod keeps answering while paused. |
 | `transition` | Present while the player is leaving the floor: `"trapdoor"` or `"beam"`. The app shows the loading doodle until the next floor's data arrives. |
 
