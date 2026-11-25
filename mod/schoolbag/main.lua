@@ -1006,6 +1006,92 @@ local function respond(client, status, contentType, body)
   client:send(head .. body)
 end
 
+-- A test page for the Thor's browser, for trying the mod before the app exists:
+-- it reads /state twice a second (so the game's HUD stays hidden, as with the
+-- app) and shows the values worth checking, with the full state underneath.
+local WATCH_PAGE = [==[<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schoolbag watch</title>
+<style>
+body { background: #1d1410; color: #e8dccb; font: 15px/1.45 monospace; margin: 12px; }
+h1 { font-size: 18px; margin: 0 0 6px; }
+label { display: block; margin: 6px 0 10px; }
+pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+summary { margin-top: 12px; cursor: pointer; }
+</style></head><body>
+<h1>Schoolbag watch</h1>
+<label><input type="checkbox" id="keep"> Keep the game's HUD (reads with ?hud=keep)</label>
+<pre id="sum">Waiting for the mod...</pre>
+<details><summary>Full state</summary><pre id="raw"></pre></details>
+<script>
+var el = function (id) { return document.getElementById(id); };
+var BAG = ["", "red heart", "soul heart", "black heart", "eternal heart", "gold heart", "bone heart",
+  "rotten heart", "penny", "nickel", "dime", "lucky penny", "key", "golden key", "charged key", "bomb",
+  "golden bomb", "giga bomb", "micro battery", "lil battery", "mega battery", "card", "pill", "rune",
+  "dice shard", "cracked key", "golden penny", "golden pill", "golden battery", "poop"];
+var POOPS = ["", "normal", "corny", "burning", "stone", "stinky", "black", "holy", "liquid", "fart",
+  "bomb", "diarrhea"];
+function hearts(h) {
+  if (!h) return "?";
+  if (h.hidden) return "hidden (Curse of the Unknown)";
+  return "red " + h.hearts + "/" + h.maxHearts + ", soul " + h.soulHearts + " (black mask " + h.blackMask +
+    "), bone " + h.boneHearts + ", gold " + h.goldenHearts + ", eternal " + h.eternalHearts +
+    ", rotten " + h.rottenHearts + ", broken " + h.brokenHearts;
+}
+function lines(s) {
+  var out = ["time " + new Date().toLocaleTimeString() + "   in run: " + s.inRun +
+    "   HUD hidden: " + s.hudHidden + "   words: " + s.strings];
+  if (!s.inRun) return out;
+  var f = s.floor || {};
+  out.push("floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
+    (s.transition ? ", leaving by " + s.transition : ""));
+  (s.players || []).forEach(function (p) {
+    var k = p.pickups || {};
+    out.push("");
+    out.push("player " + p.index + ": type " + p.type + " " + (p.name || "") + ", lives " + p.lives +
+      (p.livesMaybe ? "?" : ""));
+    out.push("  hearts: " + hearts(p.health));
+    if (p.shields && p.shields.length) out.push("  shields: " + p.shields.join(", "));
+    out.push("  coins " + k.coins + ", bombs " + k.bombs + ", keys " + k.keys +
+      (k.poopMana != null ? ", poops " + k.poopMana : "") +
+      (k.soulCharge != null ? ", soul charge " + k.soulCharge : "") +
+      (k.bloodCharge != null ? ", blood charge " + k.bloodCharge : ""));
+    if (p.poops) out.push("  next poops (of " + p.poops.max + "): " +
+      (p.poops.queue || []).map(function (t) { return POOPS[t] || t; }).join(", "));
+    if (p.otherForm) out.push("  other form (type " + p.otherForm.type + "): " + hearts(p.otherForm.health));
+    if (p.bag) out.push("  bag" + (p.bag.sure ? "" : " (NOT SURE)") + ": " +
+      ((p.bag.items || []).map(function (c) { return BAG[c] || c; }).join(", ") || "empty") +
+      " [" + (p.bag.items || []).length + "/8]");
+    out.push("  actives: " + (p.actives || []).map(function (a) { return a.slot + ":" + a.id; }).join(" ") +
+      "   items: " + (p.items || []).length + ", last " +
+      (p.items || []).slice(-3).map(function (i) { return i.id; }).join(" "));
+  });
+  var r = s.room || {};
+  out.push("");
+  out.push("room " + r.index + " (type " + r.type + "): " + ((r.pedestals || []).map(function (x, i) {
+    return (i + 1) + "=" + (x.blind ? "?" : x.id);
+  }).join(" ") || "no items"));
+  if (s.death && s.death.gameOver) out.push("game over, killed by " + JSON.stringify(s.death.killer));
+  return out;
+}
+function tick() {
+  fetch("/state" + (el("keep").checked ? "?hud=keep" : ""), { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (s) {
+      el("sum").textContent = lines(s).join("\n");
+      el("raw").textContent = JSON.stringify(s, null, 1);
+    })
+    .catch(function () {
+      el("sum").textContent = "No answer at " + new Date().toLocaleTimeString() +
+        ": the game is on a menu, or the mod isn't running.";
+    });
+}
+setInterval(tick, 500);
+tick();
+</script></body></html>
+]==]
+
 local lastPoll = nil -- Isaac.GetFrameCount() of the app's last /state request
 
 local function handle(client)
@@ -1043,6 +1129,8 @@ local function handle(client)
     end
   elseif path == "/health" then
     respond(client, "200 OK", "text/plain", "ok")
+  elseif path == "/watch" then
+    respond(client, "200 OK", "text/html; charset=utf-8", WATCH_PAGE)
   else
     respond(client, "404 Not Found", "text/plain", "not found")
   end

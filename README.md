@@ -118,10 +118,13 @@ lua5.3 tests/check_banners.lua   # the banners and boss bar drawn in the HUD's p
 lua5.3 tests/check_bag.lua       # tracking what goes into the Bag of Crafting
 ```
 
-**Trying the mod on a PC:** copy `mod/schoolbag` into the game's `mods`
+**Trying the mod:** copy `mod/schoolbag` into the game's `mods`
 folder, launch with `--luadebug`, start a run and open
-`http://127.0.0.1:8089/state` in a browser. The game's `log.txt` shows lines
-starting with `[Schoolbag]`.
+`http://127.0.0.1:8089/watch` in a browser (on the Thor, on the bottom
+screen). That test page reads the mod twice a second, like the app will, so
+the game's HUD stays hidden, and shows the values worth checking;
+`/state` is the raw data. The game's `log.txt` shows lines starting with
+`[Schoolbag]`.
 
 **Uploading to the Workshop (Windows):** copy `mod/schoolbag` into the game's
 `mods` folder, run the game's `tools/ModUploader/ModUploader.exe` and choose

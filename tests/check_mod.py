@@ -144,6 +144,11 @@ try:
     step("uncursed")
     step("plain")
 
+    print("the /watch test page")
+    status, headers, body = get("/watch")
+    check(status == 200 and "text/html" in headers.get("Content-Type", "") and "fetch(\"/state\"" in body,
+          "/watch is an HTML page that reads /state")
+
     print("reading without hiding the HUD")
     status, _, body = get("/state?hud=keep")
     check(status == 200 and json.loads(body)["inRun"] is True, "/state?hud=keep answers like /state")

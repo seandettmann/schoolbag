@@ -16,6 +16,7 @@ device can reach it.
 | `GET /state` | The full state below, as JSON. Hides the game's HUD while the app keeps reading (below). |
 | `GET /state?hud=keep` | The same state, without hiding the game's HUD (the app's "Hide the game's HUD" setting turned off). If the HUD was hidden, it comes straight back. |
 | `GET /health` | `ok` (plain text). Cheap check that the mod is up. Doesn't hide the HUD. |
+| `GET /watch` | A test page for a browser on the device: reads `/state` twice a second (so the HUD stays hidden, as with the app) and shows the values worth checking. For trying the mod before the app exists. |
 | `POST /strings` | The game's words, from the app (below). Answers `ok <count>`, or `400` if the body isn't a JSON object. |
 | anything else | `404`. |
 
