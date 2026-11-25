@@ -22,14 +22,34 @@ for the current state about ten times a second. While the app is reading, the
 mod hides the game's own HUD on the main screen, like isaac-hud; it comes back
 a few seconds after the app stops. Unlike isaac-hud, nothing goes missing: the
 mod redraws the game's floor, item, pill and card banners and the boss health
-bar itself, with the game's own art and the game's words sent over by the app. The format is in
-[`docs/protocol.md`](docs/protocol.md).
+bar itself, with the game's own art and the game's words sent over by the app.
+
+One exception: on **Tainted Cain** runs, the game's HUD comes back while his
+Bag of Crafting is full. The game only shows what the bag will make inside its
+own HUD, and mods can't read it, so this keeps the crafting preview on screen.
+It hides again once he crafts. (The game only lets mods show or hide the whole
+HUD, not parts of it.) On the bottom screen, Schoolbag shows what's in the bag.
+
+The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
 - **Mod 0.1.0:** written and tested against a stand-in for the game's API
   (see `tests/`). Not yet tested in the real game.
 - **App:** not started yet. The design mock-ups are done.
+
+## Roadmap
+
+Next:
+- The app, built from the finished mock-ups.
+- A first test of the mod in the real game on the Thor.
+
+To revisit later:
+- **Tainted Cain's crafting preview.** For now the game's whole HUD returns on
+  Tainted Cain runs while the Bag of Crafting is full (see above), with no
+  setting. Revisit if the game's mod API ever lets mods read the bag's result,
+  or a calculation that's reliable on Repentance+ turns up, so the preview can
+  move to the bottom screen and the main screen can stay clear.
 
 ## Installing (once released)
 
@@ -85,6 +105,7 @@ python3 tests/check_mock.py   # every fake-mod scenario against the protocol
 lua5.3 tests/check_reminder.lua  # the "Schoolbag is offline" banner
 lua5.3 tests/check_hud.lua       # hiding the game's HUD while the app reads
 lua5.3 tests/check_banners.lua   # the banners and boss bar drawn in the HUD's place
+lua5.3 tests/check_bag.lua       # tracking what goes into the Bag of Crafting
 ```
 
 **Trying the mod on a PC:** copy `mod/schoolbag` into the game's `mods`

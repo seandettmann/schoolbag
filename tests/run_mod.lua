@@ -37,6 +37,12 @@ function S.reorder() -- lose one copy of item 4, gain a second item 1
   W.items[4] = 0
   W.items[1] = 2
 end
+function S.tcain() -- the Bag of Crafting in the pocket, with a penny on the floor next to it
+  W.actives[2] = 710
+  W.pickups = { { Variant = 20, SubType = 1, Position = { X = 300, Y = 300 }, hash = "penny" } }
+  W.knives = { { Variant = 4, Position = { X = 320, Y = 300 } } }
+end
+function S.scooped() W.pickups = {} W.knives = {} end
 
 local stop = socket.gettime() + 60
 while socket.gettime() < stop do

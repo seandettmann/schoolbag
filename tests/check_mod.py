@@ -119,6 +119,14 @@ try:
     order3 = [it["id"] for it in s["players"][0]["items"]]
     check(4 not in order3 and order3.count(1) == 2 and order3[-1] == 1, f"lost and duplicate items: {order3}")
 
+    print("Bag of Crafting")
+    check("bag" not in s["players"][0], "no bag without the Bag of Crafting")
+    step("tcain")
+    step("scooped")
+    s, _ = state()
+    bag = s["players"][0].get("bag")
+    check(bag == {"items": [8], "sure": True}, f"the penny the bag scooped is in it: {bag}")
+
     step("quit", settle=0.1)
 finally:
     time.sleep(0.2)

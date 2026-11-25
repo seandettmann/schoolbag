@@ -1,14 +1,16 @@
 -- Schoolbag: sends the game's state to the Schoolbag app on the same device.
 --
 -- It answers HTTP requests on http://127.0.0.1:8089 (see docs/protocol.md).
--- It only reads game state; it never changes the game or hides its HUD.
+-- It only reads game state, apart from hiding the game's HUD while the app
+-- is reading (below).
 -- The server needs the game's --luadebug launch option, because that is what
 -- lets a mod load LuaSocket. Without it, the mod shows a short reminder at the
 -- start of each run, drawn like the game's own item banner, that stays up for
 -- the whole run, and does nothing else.
 --
 -- While the app is reading the run, the mod hides the game's own HUD on the
--- main screen; it comes back a few seconds after the app stops.
+-- main screen; it comes back a few seconds after the app stops, and on Tainted
+-- Cain runs while his Bag of Crafting is full (for the game's crafting preview).
 
 local mod = RegisterMod("Schoolbag", 1)
 
@@ -100,6 +102,9 @@ local run = {
   ended = nil,       -- "win" / "loss" once the run is over
   lastDamage = nil,  -- what last hurt a player (for the death screen)
   players = {},      -- per player index: { order = {ids...}, counts = {id = n} }
+  bags = {},         -- per player index: Bag of Crafting contents (see below)
+  bagsKnown = false, -- false when the mod joined a run without knowing what was in the bags
+  bagsDirty = false, -- a bag changed since the last save
 }
 
 local function playerBook(i)
@@ -115,6 +120,9 @@ local function resetRun()
   run.ended = nil
   run.lastDamage = nil
   run.players = {}
+  run.bags = {}
+  run.bagsKnown = true
+  run.bagsDirty = false
 end
 
 -- Record pickup order by watching how many of each collectible a player has.
@@ -161,13 +169,20 @@ local function scanAllPlayers()
 end
 
 local function saveRun()
-  local data = { v = 1, order = {} }
+  local seed = try(function() return game:GetSeeds():GetStartSeedString() end)
+  local data = { v = 1, order = {}, bags = {}, seed = seed }
   for i, book in ipairs(run.players) do data.order[i] = book.order end
+  for i = 1, #run.bags do
+    local b = run.bags[i]
+    data.bags[i] = b and { items = b.items, sure = b.sure } or false
+  end
   local ok, text = pcall(json.encode, data)
   if ok then mod:SaveData(text) end
+  run.bagsDirty = false
 end
 
 local function loadRun()
+  run.bagsKnown = false -- unless the save below has this run's bags
   if not mod:HasData() then return end
   local ok, data = pcall(json.decode, mod:LoadData())
   if not ok or type(data) ~= "table" or type(data.order) ~= "table" then return end
@@ -181,6 +196,296 @@ local function loadRun()
     end
     run.players[i] = book
   end
+  local seed = try(function() return game:GetSeeds():GetStartSeedString() end)
+  if type(data.bags) == "table" and data.seed ~= nil and data.seed == seed then
+    run.bagsKnown = true
+    for i, b in ipairs(data.bags) do
+      if type(b) == "table" and type(b.items) == "table" then
+        local items = {}
+        for _, c in ipairs(b.items) do
+          if type(c) == "number" then items[#items + 1] = c end
+        end
+        run.bags[i] = { items = items, sure = b.sure ~= false }
+      end
+    end
+  end
+end
+
+------------------------------------------------------------------------------
+-- Bag of Crafting: what's in the bag
+------------------------------------------------------------------------------
+-- The vanilla API can't read the bag (only REPENTOGON can), so the mod works it
+-- out: a pickup that vanishes soon after the swung bag touched it, while the
+-- player's own counters for that kind of pickup stay put, went into the bag.
+-- Best effort; `sure` turns false when the mod knows it may have missed some.
+-- Components use the game's numbering (ui_crafting.anm2 frames, 1-29).
+
+local BAG_ITEM   = enum(CollectibleType, "COLLECTIBLE_BAG_OF_CRAFTING", 710)
+local BAG_KNIFE  = enum(KnifeVariant, "BAG_OF_CRAFTING", 4)
+local BAG_SIZE   = 8
+local BAG_REACH  = 80 -- world units between the swung bag and a pickup it can scoop
+local BAG_WINDOW = 15 -- game updates a pickup stays "touched by the bag"
+local PV = {
+  HEART   = enum(PickupVariant, "PICKUP_HEART", 10),
+  COIN    = enum(PickupVariant, "PICKUP_COIN", 20),
+  KEY     = enum(PickupVariant, "PICKUP_KEY", 30),
+  BOMB    = enum(PickupVariant, "PICKUP_BOMB", 40),
+  POOP    = enum(PickupVariant, "PICKUP_POOP", 42),
+  PILL    = enum(PickupVariant, "PICKUP_PILL", 70),
+  BATTERY = enum(PickupVariant, "PICKUP_LIL_BATTERY", 90),
+  CARD    = enum(PickupVariant, "PICKUP_TAROTCARD", 300),
+}
+local PILL_GOLD = enum(PillColor, "PILL_GOLD", 14)
+local CARD_DICE_SHARD = enum(Card, "CARD_DICE_SHARD", 49)
+local CARD_CRACKED_KEY = enum(Card, "CARD_CRACKED_KEY", 78)
+
+-- pickup subtype -> the component(s) it adds; double packs add two
+local BAG_PARTS = {
+  [PV.HEART] = { [1] = { 1 }, [2] = { 1 }, [3] = { 2 }, [4] = { 4 }, [5] = { 1, 1 }, [6] = { 3 }, [7] = { 5 },
+    [8] = { 2 }, [9] = { 1 }, [10] = { 1, 2 }, [11] = { 6 }, [12] = { 7 } },
+  [PV.COIN] = { [1] = { 8 }, [2] = { 9 }, [3] = { 10 }, [4] = { 8, 8 }, [5] = { 11 }, [6] = { 9 }, [7] = { 26 } },
+  [PV.KEY] = { [1] = { 12 }, [2] = { 13 }, [3] = { 12, 12 }, [4] = { 14 } },
+  [PV.BOMB] = { [1] = { 15 }, [2] = { 15, 15 }, [4] = { 16 }, [7] = { 17 } },
+  [PV.BATTERY] = { [1] = { 19 }, [2] = { 18 }, [3] = { 20 }, [4] = { 28 } },
+}
+
+local function isRune(card)
+  return (card >= 32 and card <= 41) or card == 55 or (card >= 81 and card <= 97)
+end
+
+local function bagParts(variant, subtype)
+  if variant == PV.PILL then
+    return { (subtype & (K.HORSE_PILL - 1)) == PILL_GOLD and 27 or 22 }
+  elseif variant == PV.CARD then
+    if subtype <= 0 then return nil end
+    if subtype == CARD_DICE_SHARD then return { 24 } end
+    if subtype == CARD_CRACKED_KEY then return { 25 } end
+    return { isRune(subtype) and 23 or 21 }
+  elseif variant == PV.POOP then
+    return { 29 }
+  end
+  local byType = BAG_PARTS[variant]
+  return byType and byType[subtype] or nil
+end
+
+-- Which of the player's own counters a pickup kind would change if it were
+-- picked up the normal way. If that changes as the pickup vanishes, the player
+-- took it, not the bag.
+local function counterKind(variant)
+  if variant == PV.HEART then return "hearts"
+  elseif variant == PV.COIN then return "coins"
+  elseif variant == PV.KEY then return "keys"
+  elseif variant == PV.BOMB then return "bombs"
+  elseif variant == PV.BATTERY then return "charge"
+  elseif variant == PV.PILL or variant == PV.CARD then return "pockets"
+  elseif variant == PV.POOP then return "poop"
+  end
+end
+
+local function counters(p)
+  local c = {}
+  c.coins = tostring(try(function() return p:GetNumCoins() end))
+  c.keys = tostring(try(function() return p:GetNumKeys() end)) .. "/" .. tostring(try(function() return p:HasGoldenKey() end))
+  c.bombs = tostring(try(function() return p:GetNumBombs() end)) .. "/" .. tostring(try(function() return p:HasGoldenBomb() end))
+    .. "/" .. tostring(try(function() return p:GetNumGigaBombs() end))
+  local h = {}
+  for _, f in ipairs({ "GetMaxHearts", "GetHearts", "GetSoulHearts", "GetBlackHearts", "GetBoneHearts",
+      "GetEternalHearts", "GetGoldenHearts", "GetRottenHearts" }) do
+    h[#h + 1] = tostring(try(function() return p[f](p) end))
+  end
+  c.hearts = table.concat(h, "/")
+  local k = {}
+  for slot = 0, 3 do
+    k[#k + 1] = tostring(try(function() return p:GetCard(slot) end)) .. ":" .. tostring(try(function() return p:GetPill(slot) end))
+  end
+  c.pockets = table.concat(k, "/")
+  local ch = { tostring(try(function() return p:GetBatteryCharge() end)) }
+  for slot = 0, 3 do ch[#ch + 1] = tostring(try(function() return p:GetActiveCharge(slot) end)) end
+  c.charge = table.concat(ch, "/")
+  c.poop = tostring(try(function() return p:GetPoopMana() end))
+  return c
+end
+
+local function holdsBag(p)
+  for slot = 0, 3 do
+    if try(function() return p:GetActiveItem(slot) end) == BAG_ITEM then return true end
+  end
+  return false
+end
+
+local function bagOf(i)
+  local b = run.bags[i + 1]
+  if not b then
+    b = { items = {}, sure = run.bagsKnown }
+    run.bags[i + 1] = b
+  end
+  return b
+end
+
+local function bagAdd(i, parts)
+  local b = bagOf(i)
+  for _, c in ipairs(parts) do
+    -- a full bag drops its first pickup to make room (Tainted Cain)
+    if #b.items >= BAG_SIZE then table.remove(b.items, 1) end
+    b.items[#b.items + 1] = c
+  end
+  run.bagsDirty = true
+end
+
+local function hashOf(e)
+  return try(function() return GetPtrHash(e) end) or try(function() return e.InitSeed end) or e
+end
+
+local bagWatch = {
+  room = nil,      -- room the snapshot below belongs to
+  pickups = {},    -- hash -> { variant, subtype, touched = update it was last near the bag }
+  holders = {},    -- player index -> { hash, counters, count, active }
+}
+
+local function resetBagWatch()
+  bagWatch.room = nil
+  bagWatch.pickups = {}
+end
+
+-- Called from the pickup-collision callback too, in case the game reports the
+-- bag touching a pickup before it's gone.
+local function markTouched(pickup)
+  local seen = bagWatch.pickups[hashOf(pickup)]
+  if seen then
+    local now = game:GetFrameCount()
+    if not seen.touched or now - seen.touched > BAG_WINDOW then seen.first = now end
+    seen.touched = now
+  end
+end
+
+local function ownerIndex(knife, holders)
+  local parent = try(function() return knife.Parent end) or try(function() return knife.SpawnerEntity end)
+  if parent then
+    local h = hashOf(parent)
+    for i, w in pairs(holders) do
+      if w.hash == h then return i end
+    end
+  end
+  for i in pairs(holders) do return i end -- one holder in nearly every run
+end
+
+local function watchBag()
+  local holders = {}
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    if p and holdsBag(p) then holders[i] = p end
+  end
+  if next(holders) == nil then
+    resetBagWatch()
+    bagWatch.holders = {}
+    return
+  end
+
+  local now = game:GetFrameCount()
+  local roomIndex = try(function() return game:GetLevel():GetCurrentRoomIndex() end)
+  if roomIndex ~= bagWatch.room then
+    resetBagWatch() -- everything vanishes when the room changes
+    bagWatch.room = roomIndex
+  end
+
+  -- counters and crafting, per holder
+  local prev = bagWatch.holders
+  local current = {}
+  for i, p in pairs(holders) do
+    local w = {
+      hash = hashOf(p),
+      counters = counters(p),
+      changed = {}, -- counter kind -> the last update it changed
+      count = try(function() return p:GetCollectibleCount() end) or 0,
+      active = try(function() return p:GetActiveItem(0) end) or 0,
+    }
+    local before = prev[i]
+    if before then
+      for kind, v in pairs(w.counters) do
+        w.changed[kind] = v ~= before.counters[kind] and now or before.changed[kind]
+      end
+    end
+    local b = bagOf(i)
+    if before and #b.items >= BAG_SIZE and w.count > before.count then
+      -- a full bag and a new item in the inventory: Tainted Cain just crafted
+      b.items = {}
+      b.sure = true
+      run.bagsDirty = true
+      -- crafting an active item while holding one turns the old one into
+      -- pickups that go into the bag, which the mod can't see
+      if before.active ~= 0 and before.active ~= BAG_ITEM and w.active ~= before.active then b.sure = false end
+    end
+    current[i] = w
+  end
+  bagWatch.holders = current
+
+  -- where the swung bag is this update
+  local knives = {}
+  for _, k in ipairs(try(function() return Isaac.FindByType(K.ENTITY_KNIFE, BAG_KNIFE, -1, false, false) end) or {}) do
+    knives[#knives + 1] = { pos = k.Position, owner = ownerIndex(k, current) }
+  end
+
+  -- pickups now; mark any the bag is touching
+  local seenNow = {}
+  for _, e in ipairs(try(function() return Isaac.FindByType(K.ENTITY_PICKUP, -1, -1, false, false) end) or {}) do
+    local parts = bagParts(e.Variant, e.SubType)
+    if parts then
+      local h = hashOf(e)
+      local old = bagWatch.pickups[h]
+      local entry = { variant = e.Variant, subtype = e.SubType,
+        first = old and old.first, touched = old and old.touched, owner = old and old.owner }
+      for _, k in ipairs(knives) do
+        local dx, dy = e.Position.X - k.pos.X, e.Position.Y - k.pos.Y
+        if dx * dx + dy * dy <= BAG_REACH * BAG_REACH then
+          if not entry.touched or now - entry.touched > BAG_WINDOW then entry.first = now end
+          entry.touched, entry.owner = now, k.owner
+        end
+      end
+      seenNow[h] = entry
+    end
+  end
+
+  -- pickups that vanished since the last update
+  for h, old in pairs(bagWatch.pickups) do
+    if not seenNow[h] and old.touched and now - old.touched <= BAG_WINDOW then
+      local i = old.owner
+      if i == nil then for j in pairs(current) do i = j break end end
+      -- A pickup the player takes changes their counter at once but lingers for
+      -- its pickup animation, so look back to when the bag first reached it.
+      local kind = counterKind(old.variant)
+      local w = current[i]
+      local since = (old.first or old.touched) - 2
+      local tookIt = kind and w and w.changed[kind] and w.changed[kind] >= since
+      if not tookIt then bagAdd(i, bagParts(old.variant, old.subtype)) end
+    end
+  end
+  bagWatch.pickups = seenNow
+end
+
+-- Tainted Cain cycles the bag with the drop button. Order only decides which
+-- pickup a full bag drops next; the result doesn't depend on it.
+local function watchBagCycle()
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    local b = run.bags[i + 1]
+    if p and b and #b.items > 1 and holdsBag(p) then
+      local pressed = try(function()
+        return Input.IsActionTriggered(ButtonAction.ACTION_DROP, p.ControllerIndex)
+      end)
+      if pressed then
+        table.insert(b.items, table.remove(b.items, 1))
+        run.bagsDirty = true
+      end
+    end
+  end
+end
+
+local function bagInfo(i, p)
+  if not holdsBag(p) then return nil end
+  local b = bagOf(i)
+  local items = {}
+  for n, c in ipairs(b.items) do items[n] = c end
+  return { items = items, sure = b.sure }
 end
 
 ------------------------------------------------------------------------------
@@ -478,6 +783,7 @@ local function playerInfo(i, p, curses)
     pockets = pocketsInfo(p),
     items = itemsInfo(i),
     forms = formsInfo(p),
+    bag = try(function() return bagInfo(i, p) end),
   }
   if healthHidden then
     t.health = { hidden = true }
@@ -737,8 +1043,30 @@ local function setGameHud(visible)
   SchoolbagHudHidden = not visible
 end
 
+-- Tainted Cain's crafting preview is part of the game's HUD, and the game
+-- doesn't tell mods what the bag will make, so neither the app nor the mod can
+-- show it. On Tainted Cain runs only, the game's whole HUD comes back while the
+-- bag is full (the only time the game shows a preview), or while the mod isn't
+-- sure what's in it. Decided Nov 25 2026; to revisit (see the README's roadmap).
+local PLAYER_CAIN_B = enum(PlayerType, "PLAYER_CAIN_B", 23)
+
+local function craftingPreviewShowing()
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    if p and try(function() return p:GetPlayerType() end) == PLAYER_CAIN_B and holdsBag(p) then
+      local b = run.bags[i + 1]
+      if not b then
+        if not run.bagsKnown then return true end
+      elseif not b.sure or #b.items >= BAG_SIZE then
+        return true
+      end
+    end
+  end
+  return false
+end
+
 local function updateGameHud()
-  if run.inRun and appWatching() then
+  if run.inRun and appWatching() and not try(craftingPreviewShowing) then
     setGameHud(false)
   elseif SchoolbagHudHidden then
     setGameHud(true)
@@ -1084,6 +1412,16 @@ mod:AddCallback(ModCallbacks.MC_POST_GAME_END, function(_, isGameOver)
   run.ended = isGameOver and "loss" or "win"
 end)
 
+mod:AddCallback(enum(ModCallbacks, "MC_POST_NEW_ROOM", 19), function() resetBagWatch() end)
+
+-- If the game reports the bag touching a pickup, note it (doesn't change anything).
+mod:AddCallback(enum(ModCallbacks, "MC_PRE_PICKUP_COLLISION", 38), function(_, pickup, collider)
+  if collider and collider.Type == K.ENTITY_KNIFE and collider.Variant == BAG_KNIFE then
+    pcall(markTouched, pickup)
+  end
+  return nil
+end)
+
 -- Save the pickup order every floor too, in case the game is closed without
 -- going through the menu.
 mod:AddCallback(ModCallbacks.MC_POST_NEW_LEVEL, function()
@@ -1122,6 +1460,9 @@ mod:AddCallback(ModCallbacks.MC_POST_UPDATE, function()
     retryBind()
     local ok, err = pcall(watchPickups)
     if not ok then logOnce("couldn't watch pickups: " .. tostring(err)) end
+    ok, err = pcall(watchBag)
+    if not ok then logOnce("couldn't watch the Bag of Crafting: " .. tostring(err)) end
+    if run.bagsDirty then saveRun() end -- the game could be closed before the next floor
     ok, err = pcall(scanBosses)
     if not ok then boss.max = 0 end
   end
@@ -1156,6 +1497,7 @@ mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
     end
   end
   serve()
+  if run.inRun and not game:IsPaused() then pcall(watchBagCycle) end
   updateGameHud()
   if SchoolbagHudHidden and run.inRun then drawStandIns() end
   if remind.phase and run.inRun then

@@ -64,4 +64,18 @@ def validate(s):
         for pk in p.get("pockets") or []:
             if pk.get("kind") == "pill" and not pk.get("identified") and "effect" in pk:
                 errs.append("unidentified pill leaks its effect")
+        if "bag" in p:  # only while the player holds the Bag of Crafting
+            bag = p["bag"]
+            if not isinstance(bag, dict):
+                errs.append("player.bag not an object")
+            else:
+                need(bag, "sure", bool, "bag")
+                if not _is_list(bag.get("items")):
+                    errs.append("bag.items not a list")
+                else:
+                    items = bag["items"] or []
+                    if len(items) > 8:
+                        errs.append("bag holds more than 8")
+                    if any(not isinstance(c, int) or not 1 <= c <= 29 for c in items):
+                        errs.append("bag has an unknown component")
     return errs

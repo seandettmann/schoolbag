@@ -75,6 +75,44 @@ fire(ModCallbacks.MC_POST_GAME_STARTED, true)
 frames(2)
 poll()
 check(not visible(), "hidden again in a continued run")
+
+-- Tainted Cain: the game's HUD comes back while the Bag of Crafting is full,
+-- since its crafting preview is part of the HUD
+local hashes = 0
+local function scoop()
+  hashes = hashes + 1
+  local e = { Variant = 20, SubType = 1, Position = { X = 300, Y = 300 }, hash = "coin" .. hashes }
+  W.pickups = { e }
+  frames(2)
+  W.knives = { { Variant = 4, Position = { X = 310, Y = 300 } } }
+  frames(2)
+  W.pickups, W.knives = {}, {}
+  frames(2)
+end
+local function reading() for _ = 1, 3 do frames(6) poll() end end
+W.actives[2] = 710
+for _ = 1, 8 do scoop() end
+reading()
+check(not visible(), "a full Bag of Crafting on another character: still hidden")
+W.playerType = 23
+reading()
+check(visible(), "Tainted Cain with a full bag: the game's HUD shows (its crafting preview)")
+W.collectibles = W.collectibles + 1 -- crafted
+frames(2)
+reading()
+check(not visible(), "hidden again once he crafts and the bag empties")
+for _ = 1, 3 do scoop() end
+reading()
+check(not visible(), "a part-full bag: stays hidden")
+for _ = 1, 5 do scoop() end
+W.collectibles = W.collectibles + 1
+W.actives[0] = 118 -- crafted an active item over the D6: unseen pickups went in
+frames(2)
+reading()
+check(visible(), "shown while the mod isn't sure what's in the bag")
+W.actives[0], W.actives[2], W.playerType = 105, nil, 0
+reading()
+check(not visible(), "hidden again without the bag")
 SchoolbagServer:close()
 SchoolbagServer = nil
 -- a mod reload (luamod) while hidden: the new copy still knows to give it back

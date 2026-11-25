@@ -179,6 +179,12 @@ def scenario(name):
             {"slot": 1, "kind": "pill", "color": 5, "horse": True, "identified": True, "effect": 7,
              "name": "#FULL_HEALTH_NAME"},
         ]
+    elif name == "tcain":
+        # Tainted Cain: the Bag of Crafting in the pocket and what the mod saw go in
+        p["type"], p["name"] = 23, "Cain"
+        p["actives"].append({"slot": 2, "id": 710, "name": "#BAG_OF_CRAFTING_NAME", "charge": 0,
+                             "maxCharge": 0, "chargeType": 0, "battery": 0})
+        p["bag"] = {"items": [8, 8, 1, 12, 15, 2, 22, 21], "sure": True}
     else:
         raise KeyError(name)
     return s
@@ -186,7 +192,7 @@ def scenario(name):
 
 SCENARIOS = ["normal", "notinrun", "offline", "paused", "lost", "unknown", "blind", "loading",
              "dead", "active0", "active1", "greed", "challenge", "shields", "shieldsall",
-             "bossrush", "hush", "devil", "emptyroom", "newitem", "pills"]
+             "bossrush", "hush", "devil", "emptyroom", "newitem", "pills", "tcain"]
 
 
 class Handler(BaseHTTPRequestHandler):

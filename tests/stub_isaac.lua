@@ -102,14 +102,19 @@ ModCallbacks = {
   MC_POST_UPDATE = 1, MC_POST_RENDER = 2, MC_ENTITY_TAKE_DMG = 11,
   MC_POST_GAME_STARTED = 15, MC_POST_GAME_END = 16, MC_PRE_GAME_EXIT = 17,
   MC_POST_NEW_LEVEL = 18, MC_USE_CARD = 5, MC_USE_PILL = 10,
+  MC_POST_NEW_ROOM = 19, MC_PRE_PICKUP_COLLISION = 38,
 }
-CollectibleType = { COLLECTIBLE_HOLY_MANTLE = 313, COLLECTIBLE_GUPPYS_COLLAR = 212, COLLECTIBLE_BLANKET = 535 }
+CollectibleType = { COLLECTIBLE_HOLY_MANTLE = 313, COLLECTIBLE_GUPPYS_COLLAR = 212, COLLECTIBLE_BLANKET = 535,
+  COLLECTIBLE_BAG_OF_CRAFTING = 710 }
+ButtonAction = { ACTION_DROP = 11 }
+-- KnifeVariant, Card and PillColor.PILL_GOLD left out: the mod has fallbacks
 TrinketType = { TRINKET_BROKEN_ANKH = 28, TRINKET_WOODEN_CROSS = 121, TRINKET_GOLDEN_FLAG = 32768 }
 PillColor = { PILL_GIANT_FLAG = 2048 }
 LevelCurse = { CURSE_OF_THE_LOST = 4, CURSE_OF_THE_UNKNOWN = 8, CURSE_OF_BLIND = 64 }
 EntityType = { ENTITY_PLAYER = 1, ENTITY_TEAR = 2, ENTITY_PICKUP = 5, ENTITY_LASER = 7,
   ENTITY_KNIFE = 8, ENTITY_PROJECTILE = 9, ENTITY_EFFECT = 1000 }
-PickupVariant = { PICKUP_COLLECTIBLE = 100 }
+PickupVariant = { PICKUP_COLLECTIBLE = 100, PICKUP_HEART = 10, PICKUP_COIN = 20, PICKUP_KEY = 30,
+  PICKUP_BOMB = 40, PICKUP_POOP = 42, PICKUP_PILL = 70, PICKUP_LIL_BATTERY = 90, PICKUP_TAROTCARD = 300 }
 RoomType = { ROOM_BOSS = 5 }
 StageType = { STAGETYPE_REPENTANCE = 4, STAGETYPE_REPENTANCE_B = 5 }
 GameStateFlag = { STATE_BOSSRUSH_DONE = 3, STATE_BLUEWOMB_DONE = 4 }
@@ -127,6 +132,12 @@ W = {
   playing = nil,
   pedestals = {},
   saved = nil,
+  -- Bag of Crafting tests
+  actives = { [0] = 105, [1] = 45 },
+  pickups = {},   -- { Variant, SubType, Position = {X, Y}, hash }
+  knives = {},    -- { Variant, Position = {X, Y} }
+  coins = 157, keys = 1, bombs = 2, collectibles = 2,
+  roomIndex = 45, seed = "ABCD EFGH",
 }
 
 local NAMES = { [1] = "#THE_SAD_ONION_NAME", [4] = "#CRICKETS_HEAD_NAME", [45] = "#YUM_HEART_NAME",
@@ -165,7 +176,7 @@ local level = {
   GetName = function() error("needs arguments in this version") end,
   GetRooms = function() return newRooms() end,
   GetCurrentRoomDesc = function() return { SafeGridIndex = 45 } end,
-  GetCurrentRoomIndex = function() return 45 end,
+  GetCurrentRoomIndex = function() return W.roomIndex end,
   GreedModeWave = 6,
 }
 
@@ -182,16 +193,18 @@ local pool = {
 local player = {
   MoveSpeed = 1.0, MaxFireDelay = 10, Damage = 5.25, TearRange = 260, ShotSpeed = 1.0, Luck = 1.0,
 }
-function player:GetPlayerType() return 0 end
+function player:GetPlayerType() return W.playerType or 0 end
 function player:GetName() return "Isaac" end
 function player:GetExtraLives() return 1 end
 function player:HasCollectible(id) return (W.items[id] or 0) > 0 end
 function player:GetCollectibleNum(id) return W.items[id] or 0 end
 function player:HasTrinket(id) return W.trinkets[0] & 32767 == id or W.trinkets[1] & 32767 == id end
 function player:GetTrinket(slot) return W.trinkets[slot] or 0 end
-function player:GetNumCoins() return 157 end
-function player:GetNumBombs() return 2 end
-function player:GetNumKeys() return 1 end
+function player:GetNumCoins() return W.coins end
+function player:GetNumBombs() return W.bombs end
+function player:GetNumKeys() return W.keys end
+function player:GetCollectibleCount() return W.collectibles end
+player.ControllerIndex = 0
 function player:HasGoldenBomb() return false end
 function player:HasGoldenKey() return true end
 function player:GetNumGigaBombs() return 0 end
@@ -210,10 +223,7 @@ function player:IsBoneHeart() return false end
 function player:GetEffects()
   return { GetCollectibleEffectNum = function(_, id) return id == 313 and W.effectsMantle or 0 end }
 end
-function player:GetActiveItem(slot)
-  if slot == 0 then return 105 elseif slot == 1 then return 45 end
-  return 0
-end
+function player:GetActiveItem(slot) return W.actives[slot] or 0 end
 function player:GetActiveCharge(slot) return slot == 0 and 4 or 2 end
 function player:GetBatteryCharge() return 0 end
 function player:GetCard(slot) return slot == 0 and 1 or 0 end
@@ -234,7 +244,7 @@ function game:GetLevel() return level end
 function game:GetRoom() return room end
 function game:GetNumPlayers() return 1 end
 function game:IsPaused() return W.paused end
-function game:GetSeeds() return { GetStartSeedString = function() return "ABCD EFGH" end } end
+function game:GetSeeds() return { GetStartSeedString = function() return W.seed end } end
 function game:GetVictoryLap() return 0 end
 function game:GetStateFlag(f) return f == 3 end
 function game:IsGreedMode() return W.greed end
@@ -248,14 +258,25 @@ function hud:SetVisible(v) W.hudVisible = v W.hudSets = (W.hudSets or 0) + 1 end
 function game:GetHUD() return hud end
 
 function Game() return game end
+function GetPtrHash(e) return e.hash or e end
+Input = { IsActionTriggered = function(action) return action == ButtonAction.ACTION_DROP and W.dropPressed == true end }
 
 Isaac = {
   GetPlayer = function(i) if i == 0 then return player end end,
   GetItemConfig = function() return itemConfig end,
-  FindByType = function()
+  FindByType = function(t, v)
     local out = {}
+    if t == EntityType.ENTITY_KNIFE then
+      for _, k in ipairs(W.knives) do
+        if v == nil or v == -1 or k.Variant == v then out[#out + 1] = k end
+      end
+      return out
+    end
+    if t == EntityType.ENTITY_PICKUP and v == -1 then
+      for _, e in ipairs(W.pickups) do out[#out + 1] = e end
+    end
     for _, ped in ipairs(W.pedestals) do
-      local e = { SubType = ped.id, Position = { X = ped.x, Y = ped.y } }
+      local e = { Variant = 100, SubType = ped.id, Position = { X = ped.x, Y = ped.y } }
       local pk = { Price = ped.price or -2, OptionsPickupIndex = ped.group or 0 } -- the game has prices; the mod must not send them
       function e:ToPickup() return pk end
       out[#out + 1] = e

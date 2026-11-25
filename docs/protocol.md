@@ -37,6 +37,14 @@ the run ends, and on the menus, so a closed app or a switched-off bottom
 screen never leaves the player without a HUD. Reading while paused keeps it
 hidden.
 
+**Tainted Cain:** on a Tainted Cain run, the HUD stays showing while his Bag
+of Crafting is full, or while the mod isn't sure what's in it (`bag.sure` is
+false). The game only shows what the bag will make inside its own HUD, mods
+can't read it, and the game only lets mods show or hide the whole HUD, so this
+is the only way to keep the crafting preview on screen. It hides again once he
+crafts. Other characters holding the bag don't get this. On the roadmap to
+revisit.
+
 **What the mod draws while the HUD is hidden:** hiding the game's HUD also hides
 the banners it shows for a new floor (with its curse on the paper strip), a
 picked-up item (with its one-line description), a pill and a card, and the
@@ -236,6 +244,17 @@ Player 1 is first. Co-op players, Jacob & Esau and similar follow.
 | `pockets[]` | Cards and runes (`kind: "card"`), pills (`kind: "pill"`, with `color`, `identified` and, once identified, `effect`). Pocket actives are in `actives`. |
 | `items[]` | Passive and active collectibles **in pickup order**, duplicates kept. Saved with the run, so continuing a run keeps the order. |
 | `forms[]` | Progress toward each transformation, indexed by `PlayerForm` number. |
+| `bag` | Only while the player holds the Bag of Crafting (Tainted Cain's pocket). `items` lists what's in it, oldest first, as the game's crafting components 1–29 (the frames of `ui_crafting.anm2`: 1 red heart, 2 soul heart, 3 black heart, 4 eternal heart, 5 gold heart, 6 bone heart, 7 rotten heart, 8 penny, 9 nickel, 10 dime, 11 lucky penny, 12 key, 13 golden key, 14 charged key, 15 bomb, 16 golden bomb, 17 giga bomb, 18 micro battery, 19 lil' battery, 20 mega battery, 21 card, 22 pill, 23 rune or soul stone, 24 dice shard, 25 cracked key, 26 golden penny, 27 golden pill, 28 golden battery, 29 poop). At most 8. See "The Bag of Crafting" below. |
+
+### The Bag of Crafting
+
+The game's mod API can't read the bag (only REPENTOGON can), so the mod works it out and `bag` is a best guess:
+
+- A pickup goes in when it vanishes within half a second of the swung bag reaching it (80 world units, or the game reporting the bag touching it), **and** the player's own counter for that kind of pickup (coins, keys, bombs, hearts, cards and pills, charges, poops) didn't change between the bag first reaching it and it vanishing (a pickup the player takes changes their counter at once, then lingers for its pickup animation). Double packs add two; a blended heart adds a red and a soul heart.
+- A full bag drops its oldest pickup for the new one. The drop button cycles the bag (oldest to the end). A full bag empties when a new item turns up in the player's inventory (a craft).
+- `sure` is false when the mod knows it may have missed something: it joined a run without knowing the bag (mod save data missing or from another run), or Tainted Cain crafted an active item while holding one (the old item turns into pickups that go into the bag unseen). It turns true again after the next craft.
+- The bag is saved with the run whenever it changes, so continuing a run keeps it.
+- No crafting result: the mod doesn't send what the bag would make (mods can't read it, and the known calculation isn't reliable on Repentance+). On Tainted Cain runs the game's own HUD comes back while the bag is full, so the game's preview stays on the main screen (see above).
 
 ## `chances`
 
