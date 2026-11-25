@@ -1,5 +1,7 @@
 # Schoolbag
 
+[![Made with Claude](https://img.shields.io/badge/made%20with-Claude-6A5C52)](#made-with-ai)
+
 A bottom-screen HUD for **The Binding of Isaac: Repentance+** on dual-screen
 Android handhelds like the AYN Thor. Your hearts, items, map, room and stats
 live on the second screen, drawn in the game's own notebook-and-parchment
@@ -19,10 +21,11 @@ There are two pieces, both called Schoolbag:
 
 The mod answers on `http://127.0.0.1:8089` (loopback only). The app asks it
 for the current state about ten times a second. While the app is reading, the
-mod hides the game's own HUD on the main screen, like isaac-hud; it comes back
-a few seconds after the app stops. Unlike isaac-hud, nothing goes missing: the
-mod redraws the game's floor, item, pill and card banners and the boss health
-bar itself, with the game's own art and the game's words sent over by the app.
+mod hides the game's own HUD on the main screen, since the app shows it on the
+bottom screen; it comes back a few seconds after the app stops. Hiding the HUD
+also hides the game's floor, item, pill and card banners and the boss health
+bar, so the mod draws those itself, with the game's own art and the game's
+words sent over by the app.
 
 One exception: on **Tainted Cain** runs, the game's HUD comes back while his
 Bag of Crafting is full. The game only shows what the bag will make inside its
@@ -67,19 +70,26 @@ To revisit later:
 `--luadebug` gives every Lua mod you have installed access to files and the
 network, not just this one. Only run mods you trust alongside it.
 
-Schoolbag uses port 8089, so it can run alongside isaac-hud's hud-stream mod
-(port 8088).
+Turn off any other mod that hides the game's HUD while you use Schoolbag.
+Schoolbag brings the HUD back when the app stops reading (and on Tainted Cain
+runs while the Bag of Crafting is full), and another mod would keep hiding it.
 
 ## Credits and game art
 
 The Binding of Isaac and all of its art are © Edmund McMillen and Nicalis.
-**No game art is in this repository.** Like isaac-hud, the release APK is built
-with art extracted from the maintainer's own copy of the game, using the game's
+**No game art is in this repository.** The release APK is built with art
+extracted from the maintainer's own copy of the game, using the game's
 `tools/ResourceExtractor`. If the rights holders ask, releases will come down
 promptly.
 
 Inspired by [isaac-hud](https://github.com/SufficientOO/isaac-hud) and the
-dual-screen companion for the Eden Duo.
+Eden Duo emulator's dual-screen
+[companion for The Binding of Isaac](https://github.com/igawa6/eden-duo-companions#the-binding-of-isaac-afterbirth-and-repentance-dlc).
+
+## Made with AI
+
+Most of Schoolbag's code, docs and design were written with Claude, Anthropic's
+AI model. No AI image generator was used; the art is the game's own.
 
 ## For developers
 
@@ -123,6 +133,5 @@ is a placeholder thumbnail (no game art) if the uploader asks for one.
 
 ## License
 
-GPL-3.0 (see [`LICENSE`](LICENSE)), the same as isaac-hud. It covers
-Schoolbag's own code and docs. The game's art isn't in this repository and
+GPL-3.0 (see [`LICENSE`](LICENSE)). It covers Schoolbag's own code and docs. The game's art isn't in this repository and
 isn't covered by it: it belongs to Edmund McMillen and Nicalis.

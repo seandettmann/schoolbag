@@ -6,8 +6,8 @@ the bottom-screen HUD. Reading hides the game's own HUD while the app is
 watching (below), and the app sends the mod one thing: the game's words for the
 banners the mod draws in the HUD's place (`POST /strings`).
 
-Port 8089 was picked so Schoolbag can run alongside hud-stream (isaac-hud's mod,
-which uses 8088). The server only listens on the loopback address.
+The server only listens on the loopback address, so nothing outside the
+device can reach it.
 
 ## Endpoints
 
@@ -31,10 +31,10 @@ the paper strip under it. It uses the game's own banner sprite and fonts and
 steps aside whenever the game shows a banner of its own in the same spot.
 
 **The game's own HUD:** while `/state` is being read, the mod hides the game's
-HUD on the main screen (as isaac-hud does), since the app shows it on the other
-screen. It comes back by itself 3 seconds after the last `/state` read, when
-the run ends, and on the menus, so a closed app or a switched-off bottom
-screen never leaves the player without a HUD. Reading while paused keeps it
+HUD on the main screen, since the app shows it on the other screen. It comes
+back by itself 3 seconds after the last `/state` read, when the run ends, and
+on the menus, so a closed app or a switched-off bottom screen never leaves the
+player without a HUD. Reading while paused keeps it
 hidden.
 
 **Tainted Cain:** on a Tainted Cain run, the HUD stays showing while his Bag

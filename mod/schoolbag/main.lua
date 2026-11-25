@@ -1021,8 +1021,8 @@ end
 -- The game's own HUD
 ------------------------------------------------------------------------------
 -- While the app is showing the HUD on the other screen, the game's own HUD is
--- hidden on the main screen, like isaac-hud does. It comes back by itself a
--- few seconds after the app stops asking, so closing the app or turning the
+-- hidden on the main screen. It comes back by itself a few seconds after the
+-- app stops asking, so closing the app or turning the
 -- bottom screen off never leaves you without a HUD.
 
 local HUD_GRACE = 3 * 60 -- render frames (60 a second) with no request before the HUD returns
