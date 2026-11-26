@@ -71,6 +71,15 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
   Local co-op on a handheld is unusual. (Jacob & Esau is designed: it follows
   the game's own layout.)
 
+**Later** (ideas for eventual development)
+- **A background that follows the run.** The floor behind the pages is the
+  Basement's today. It would change with the floor Isaac is on (the Caves,
+  the Depths, the Womb, the alternate paths and the rest), so the bottom
+  screen moves through the run with him. The game has its own floor art for
+  every chapter, and the mod already sends the floor and its path. Still to
+  design: which part of each floor's art to use, and how it changes over
+  (when the next floor's data arrives, or with a transition of its own).
+
 **To revisit**
 - **Tainted Cain's crafting preview.** For now the game's whole HUD returns on
   Tainted Cain runs while the Bag of Crafting is full (see above), with no
