@@ -197,9 +197,10 @@ public final class Hud {
         if (!blind) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
     }
 
-    // the Items and Room grids: 7 items a row at 3x, 120 apart, three rows in view
+    // the Items and Room grids: 7 items a row at 3x, 120 apart, three rows in view,
+    // centred on the sheet's paper (about 24 to 915 across), from GRID_LEFT
     static final int GRID_COLS = 7, GRID_ROWS = 3;
-    static final float GRID_STEP_X = 120, GRID_STEP_Y = 126;
+    static final float GRID_LEFT = 62, GRID_STEP_X = 120, GRID_STEP_Y = 126;
     // the scroll arrow's drawn part (20 x 7 game pixels, 6 in and 5 down in its frame)
     // sits this far above the bottom of the Items and Room sheets
     static final float ARROW_UP_FROM_BOTTOM = 40;
@@ -209,14 +210,14 @@ public final class Hud {
      * centred under the grid near the bottom of the sheet. It points down while
      * there are rows further down (a tap moves a row), and up once at the end (a
      * tap goes back to the top). A swipe up or down on the page moves a row
-     * either way (Ui.scroll). `left` is the grid's first column.
+     * either way (Ui.scroll).
      */
-    void gridScroll(int rows, int first, float left) {
+    void gridScroll(int rows, int first) {
         ui.gridRows = rows;
         ui.gridFirst = first;
         if (rows <= GRID_ROWS) return;
         boolean more = first < rows - GRID_ROWS;
-        float cx = left + ((GRID_COLS - 1) * GRID_STEP_X + 96) / 2f;
+        float cx = GRID_LEFT + ((GRID_COLS - 1) * GRID_STEP_X + 96) / 2f;
         float ty = (178 + EXTRA) * 3 - ARROW_UP_FROM_BOTTOM; // the triangle's top
         p.sprite(more ? "arrow_down" : "arrow_up", cx - 48, ty - 15, 3, 1f);
         final int back = -first;
@@ -565,8 +566,9 @@ public final class Hud {
             float ty = y + (h - TAB_TEXT) / 2f + dy - TAB_LIFT;
             centered(Face.SMALL, TAB_TEXT, TAB_TEXT, (String) tab[1], x, ty, w, INK);
             if (active) {
-                // a little uneven, like the game's doodles
-                float lw = p.width(Face.SMALL, TAB_TEXT, (String) tab[1]) + 12, lx = x + (w - lw) / 2f;
+                // a little uneven, like the game's doodles, and a little inside the word's
+                // ends, so it stays clear of the scrap's torn edges
+                float lw = p.width(Face.SMALL, TAB_TEXT, (String) tab[1]) - 8, lx = x + (w - lw) / 2f;
                 float ly = ty + TAB_TEXT * Face.SMALL.ascent + 1;
                 p.rect(lx, ly + 1, lw * 0.35f, 4, INK);
                 p.rect(lx + lw * 0.35f, ly, lw * 0.4f, 4, INK);

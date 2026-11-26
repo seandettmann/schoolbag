@@ -70,10 +70,10 @@ final class TabItems {
             int first = ui.itemsRow < 0 ? most : Math.min(ui.itemsRow, most);
             for (int i = first * Hud.GRID_COLS; i < cells.size() && i < (first + Hud.GRID_ROWS) * Hud.GRID_COLS; i++) {
                 int k = i - first * Hud.GRID_COLS;
-                float x = 54 + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = GRID_TOP + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
+                float x = Hud.GRID_LEFT + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = GRID_TOP + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
                 cell(h, cells.get(i), i, selIndex, x, y, 3);
             }
-            h.gridScroll(rows, first, 54);
+            h.gridScroll(rows, first);
         }
 
         // the card for the selected item
