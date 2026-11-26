@@ -19,7 +19,7 @@ libraries.
 
 **Game art is never committed here.** The build reads it from
 `src/main/assets/art` (git-ignored), which GitHub's build fills from the private
-`schoolbag-art` repo. `../tools/art/build_bundle.py` makes that folder from an
+`schoolbag-art` repo. `../tools/artbundle/build_bundle.py` makes that folder from an
 extraction of the game.
 
 **Builds:** every push to `main` that touches `app/` builds the app on GitHub

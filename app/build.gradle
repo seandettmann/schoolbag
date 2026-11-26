@@ -1,6 +1,6 @@
 // Schoolbag, the Android app. Plain Java and the Android framework only: no
 // libraries. The game's art isn't in this repo: the build expects it in
-// src/main/assets/art (see ../tools/art and the README).
+// src/main/assets/art (see ../tools/artbundle and the README).
 plugins {
     id 'com.android.application' version '8.7.3'
 }

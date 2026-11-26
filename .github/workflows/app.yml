@@ -36,7 +36,7 @@ jobs:
           mkdir -p app/src/main/assets
           cp -r artrepo/art app/src/main/assets/art
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -98,7 +98,9 @@ jobs:
           VERSION=$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" app/build.gradle)
           N=${{ github.run_number }}
           APK=schoolbag-$VERSION-$N.apk
-          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          BUILT=$(ls app/build/outputs/apk/release/*.apk | grep -v unsigned | head -1)
+          if [ -z "$BUILT" ]; then echo "::error::No signed APK was built"; ls -R app/build/outputs/apk; exit 1; fi
+          cp "$BUILT" "$APK"
           NOTES="Test build $N of the Schoolbag app $VERSION, from $(git rev-parse --short HEAD)."
           if [ "$KIND" = "throwaway" ]; then
             NOTES="$NOTES Signed with a throwaway key: uninstall the previous build before installing this one."
