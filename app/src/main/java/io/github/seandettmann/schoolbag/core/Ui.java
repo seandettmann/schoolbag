@@ -13,7 +13,8 @@ import java.util.Random;
  * waiting page's paper.
  */
 public final class Ui {
-    public String tab = "items";
+    /** The tab showing. Every run starts on the Map tab. */
+    public String tab = "map";
     /** "run", "trinket" or "card": what the item card shows. -1 = the newest item. */
     public String selKind = "run";
     public int sel = -1;

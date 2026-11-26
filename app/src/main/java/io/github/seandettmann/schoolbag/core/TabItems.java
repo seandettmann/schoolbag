@@ -32,7 +32,7 @@ final class TabItems {
         Painter p = h.p();
         Ui ui = h.ui();
         Words w = h.words();
-        p.sprite("paper", 0, 0, 3, 1f);
+        Hud.page(p, "paper", Hud.EXTRA, 0);
         List<Cell> cells = cells(player);
         // a new item: jump to it
         if (cells.size() != ui.itemCountSeen) {
@@ -43,7 +43,7 @@ final class TabItems {
         boolean detail = ui.detail && selIndex >= 0;
 
         if (!detail) p.sprite("wm_hanger", 772, 20, 2, 0.14f);
-        p.sprite("wm_bible", 790, 660, 2, 0.14f);
+        p.sprite("wm_bible", 790, 660 + Hud.EXTRA * 3, 2, 0.14f);
 
         if (detail) {
             h.itemDetail(cells.get(selIndex).id);

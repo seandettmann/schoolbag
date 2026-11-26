@@ -37,6 +37,7 @@ final class HudView extends View implements Poller.Listener {
     private float scale = 1, ox, oy;
     private int lastRoom = -1;
     private boolean lastRoomItems = false;
+    private String lastSeed = null;
     private int[] shift = SHIFT[0];
 
     HudView(Context c) {
@@ -58,6 +59,14 @@ final class HudView extends View implements Poller.Listener {
         if (!ui.everAnswered || (state != null && !state.get("inRun").bool() && s.get("inRun").bool())) {
             ui.newPaper();
         }
+        // a run starting (or the app first seeing one, or a new seed): the Map tab
+        String seed = s.get("inRun").bool() ? s.get("run").get("seed").str() : null;
+        if (seed != null && (state == null || !state.get("inRun").bool() || !seed.equals(lastSeed))) {
+            ui.tab = "map";
+            ui.detail = false;
+            ui.roomDetail = false;
+        }
+        if (seed != null) lastSeed = seed;
         // following the room (if that's switched on): the Room tab in a room with
         // items (or when items turn up), the Map tab again on leaving it
         int room = s.get("room").get("index").integer(-1);

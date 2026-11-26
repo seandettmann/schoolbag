@@ -48,16 +48,10 @@ final class Floors {
         return name;
     }
 
-    /** The floor without its number, for Greed mode's header ("Caves"). */
-    static String shortName(Words w, Json.J floor) {
+    /** Greed mode's floors, which have no numbers ("Caves", "Sheol", "The Shop"). */
+    static String greedName(Words w, Json.J floor) {
         String k = key(floor, true);
         return k != null ? w.text("#" + k + "_NAME") : floor.get("name").str();
-    }
-
-    /** The first curse on the floor (0 Darkness ... 7 Giant), or -1. */
-    static int firstCurse(int curses) {
-        for (int i = 0; i < 8; i++) if ((curses & (1 << i)) != 0) return i;
-        return -1;
     }
 
     /** "Curse of Darkness", without the game's "!" (the header has no room for shouting). */

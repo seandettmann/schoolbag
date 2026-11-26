@@ -6,18 +6,23 @@ import java.util.Locale;
 
 /**
  * Draws the bottom screen from the mod's state: the header (actives, hearts,
- * floor, clock, curse), the pickups scrap, the stats, the three tabs and their
- * pages, and the waiting and settings pages. Every position comes from the
- * approved mock-ups (1240 x 1080 points).
+ * and one line of floor or mode, curses and clock), the pickups scrap, the
+ * stats, the three tabs and their pages, and the waiting and settings pages.
+ * Positions start from the approved mock-ups (1240 x 1080 points); since the
+ * Thor tests the header is one line, the tabs sit beside the hearts and the
+ * pages are taller.
  */
 public final class Hud {
     static final int W = 1240, H = 1080;
     static final int INK = 0xFF362F2D, GREY = 0xFF6A5C52, NUMGREY = 0xFF7E6F62, HUDTEXT = 0xFFF5F0EA,
             FLOORTEXT = 0xFFBDB0A2, CURSETEXT = 0xFFE6CCF7, BLACK = 0xFF000000, PAPER = 0xFFC7B29A;
-    // the main page's box
-    static final int MX = 272, MY = 246;
+    // the main page's box: its top-left, and how many game pixels taller every
+    // page is than its art (the room the one-line header gave back)
+    static final int MX = 272, MY = 190, EXTRA = 18;
+    // the tabs: beside the hearts, under the header's line
+    static final float TABS_X = 626, TABS_Y = 84;
     // text sizes, a step up from the mock-ups after the first look on the Thor
-    static final float LINE = 54;      // the header's floor and curse
+    static final float LINE = 54;      // the header's line
     static final float NAME = 72;      // an item's name on its card
     static final float BODY = 60;      // the small hand lettering on cards and strips
     static final float DETAIL = 46;    // an item's full description
@@ -137,7 +142,7 @@ public final class Hud {
      * (or closes) the item's full description.
      */
     void itemCard(int id, String nameCode, boolean blind, float stripW, boolean open, String back, Runnable toggle) {
-        float cx = 72, cy = 580;
+        float cx = 72, cy = 580 + EXTRA * 3;
         p.save();
         p.clip(cx, cy, 790, 216);
         if (blind) {
@@ -161,7 +166,7 @@ public final class Hud {
         for (Json.J l : w.lines(id)) lines.add(l.str());
         if (lines.isEmpty()) lines.add(w.quote("collectibles", id));
         p.save();
-        p.clip(60, 96, 830, 400);
+        p.clip(60, 96, 830, 400 + EXTRA * 3);
         float y = 108;
         for (String line : lines) {
             for (String l : wrap(Face.SMALL, DETAIL, line, 800)) {
@@ -171,6 +176,20 @@ public final class Hud {
             y += 10;
         }
         p.restore();
+    }
+
+    /**
+     * A page's paper at 3x: the big sheet grow game pixels taller (a plain band
+     * of its middle repeated), the strip under it cut game pixels shorter (a
+     * band of its middle left out).
+     */
+    static void page(Painter p, String region, int grow, int cut) {
+        p.spritePart(region, 0, 0, 320, 100, 0, 0, 3, 1f);
+        for (int done = 0; done < grow; done += 40)
+            p.spritePart(region, 0, 60, 320, Math.min(40, grow - done), 0, (100 + done) * 3, 3, 1f);
+        p.spritePart(region, 0, 100, 320, 78, 0, (100 + grow) * 3, 3, 1f);
+        p.spritePart(region, 0, 178, 320, 30, 0, (178 + grow) * 3, 3, 1f);
+        p.spritePart(region, 0, 208 + cut, 320, 272 - 208 - cut, 0, (208 + grow) * 3, 3, 1f);
     }
 
     float spriteW(String region, float zoom) { int[] s = p.size(region); return s == null ? 0 : s[0] * zoom; }
@@ -209,12 +228,18 @@ public final class Hud {
             drawHeart(slots.get(i), heartsX + (i % 6) * 60, 16 + (i / 6) * 50, 5);
         for (int i = 12; i < slots.size(); i++)
             drawHeart(slots.get(i), heartsX + 360 + (i - 12) * 60, 66, 5);
+        // the header's line stops short of the hearts' first row and the lives
+        int row1 = Math.min(Math.min(slots.size(), 12), 6);
+        float left = hasActive ? 244 : 24;
+        if (row1 > 0) left = heartsX + (row1 - 1) * 60 + 75;
         int lives = player.get("lives").integer();
         if (lives > 0 && !dead) {
-            float lx = heartsX + Math.min(Math.min(slots.size(), 12), 6) * 60 + 22;
-            outlined(Face.NUMBER, 52, 52, "x" + lives + (player.get("livesMaybe").bool() ? "?" : ""), lx, 30, HUDTEXT, 4);
+            float lx = heartsX + row1 * 60 + 22;
+            String t = "x" + lives + (player.get("livesMaybe").bool() ? "?" : "");
+            outlined(Face.NUMBER, 52, 52, t, lx, 30, HUDTEXT, 4);
+            left = Math.max(left, lx + p.width(Face.NUMBER, 52, t));
         }
-        headerRight(s);
+        headerRight(s, left + 24);
     }
 
     private static Hearts.Heart heart(String name) { return new Hearts.Heart(name); }
@@ -239,52 +264,40 @@ public final class Hud {
         if (p.size("bar-BarOverlay" + max) != null) p.sprite("bar-BarOverlay" + max, x, y, zoom, 1f);
     }
 
-    private void headerRight(Json.J s) {
+    /**
+     * The header's one line, right-aligned: the curses (the game's icons) and the
+     * mirror world, then the floor's name (or Greed's mode in its place), then
+     * the clock (or Greed's wave). The name is cut short before it reaches left.
+     */
+    private void headerRight(Json.J s, float left) {
         Json.J run = s.get("run"), floor = s.get("floor");
         int difficulty = run.get("difficulty").integer();
         boolean greed = difficulty >= 2;
-        String clock = clock(run.get("timeFrames").lng());
-        float right = W - 24, top = 18;
-        // line 1: floor name, then the clock (or Greed's wave)
-        String name = Floors.name(w, floor, s.get("map").get("mirrored").bool());
+        List<Object[]> items = new ArrayList<>();
+        int curses = floor.get("curses").integer();
+        for (int i = 0; i < 8; i++)
+            if ((curses & (1 << i)) != 0 && p.size("curse_" + (i + 1)) != null) items.add(new Object[]{"icon", "curse_" + (i + 1)});
+        if (s.get("map").get("mirrored").bool()) items.add(new Object[]{"icon3", "i-mirrorroom"});
         if (greed) {
             int wave = floor.get("greedWave").integer(), waves = floor.get("greedWaves").integer();
-            flexRight(right, top, new Object[][]{
-                    {"text", Floors.shortName(w, floor)},
-                    {"sprite", "lvl_greed", 4f, -12f},
-                    {"num", "Wave " + wave + "/" + waves}});
+            items.add(new Object[]{"text", difficulty == 3 ? "Greedier!" : "Greed Mode", 0xFFF2C94C});
+            items.add(new Object[]{"sprite", "lvl_greed", 4f, -12f});
+            items.add(new Object[]{"num", "Wave " + wave + "/" + waves});
         } else {
-            flexRight(right, top, new Object[][]{
-                    {"text", name},
-                    {"sprite", "lvl_clock", 4f, -16f},
-                    {"num", clock}});
+            items.add(new Object[]{"text", Floors.name(w, floor, s.get("map").get("mirrored").bool())});
+            items.add(new Object[]{"sprite", "lvl_clock", 4f, -16f});
+            items.add(new Object[]{"num", clock(run.get("timeFrames").lng())});
         }
-        // line 2: the curse (or the mode, or the mirror world)
-        float top2 = top + LINE + 8;
-        String mode = greed ? (difficulty == 3 ? "Greedier!" : "Greed Mode") : run.get("challenge").integer() > 0 ? "Challenge" : "";
-        int curses = floor.get("curses").integer();
-        int ci = Floors.firstCurse(curses);
-        if (!mode.isEmpty()) {
-            int color = greed ? 0xFFF2C94C : 0xFF9FD3F0;
-            List<Object[]> items = new ArrayList<>();
-            if (ci >= 0) items.add(new Object[]{"icon", "curse_" + (ci + 1)});
-            items.add(new Object[]{"text", mode, color});
-            flexRight(right, top2, items.toArray(new Object[0][]), 10);
-        } else if (s.get("map").get("mirrored").bool()) {
-            flexRight(right, top2, new Object[][]{{"icon3", "i-mirrorroom"}, {"text", "Mirror world", 0xFFDCE3EC}}, 10);
-        } else if (ci >= 0) {
-            flexRight(right, top2, new Object[][]{{"icon", "curse_" + (ci + 1)}, {"text", Floors.curseName(w, ci), CURSETEXT}}, 10);
-        }
+        flexRight(W - 24, 18, left, items.toArray(new Object[0][]), 14);
     }
 
-    private void flexRight(float right, float top, Object[][] items) { flexRight(right, top, items, 14); }
-
     /**
-     * A right-aligned row of the header's pieces, vertically centred in a 50-point
-     * line, like the mock-up's flex rows. Kinds: text (hand lettering), num
-     * (numbers), sprite (with left and right margins), icon (2x), icon3 (3x).
+     * A right-aligned row of the header's pieces, vertically centred in the line,
+     * like the mock-up's flex rows. Kinds: text (hand lettering), num (numbers),
+     * sprite (with left and right margins), icon (2x), icon3 (3x). If the row
+     * would reach past left, its text is cut short to fit.
      */
-    private void flexRight(float right, float top, Object[][] items, float gap) {
+    private void flexRight(float right, float top, float left, Object[][] items, float gap) {
         float[] widths = new float[items.length];
         float total = 0;
         for (int i = 0; i < items.length; i++) {
@@ -297,6 +310,15 @@ public final class Hud {
                 case "icon3": widths[i] = spriteW((String) it[1], 3) - 14; break;
             }
             total += widths[i] + (i > 0 ? gap : 0);
+        }
+        for (int i = 0; i < items.length && total > right - left; i++) {
+            if (!"text".equals(items[i][0])) continue;
+            float room = widths[i] - (total - (right - left));
+            String cut = room > 40 ? fit(Face.SMALL, LINE, (String) items[i][1], room) : "";
+            items[i] = items[i].clone();
+            items[i][1] = cut;
+            total -= widths[i] - p.width(Face.SMALL, LINE, cut);
+            widths[i] = p.width(Face.SMALL, LINE, cut);
         }
         float x = right - total;
         for (int i = 0; i < items.length; i++) {
@@ -414,25 +436,36 @@ public final class Hud {
 
     // ---- tabs ----
 
+    /**
+     * The three tabs, beside the hearts. Each is the game's paper scrap with a
+     * plain band out of its middle (keep the first columns, carry on from a
+     * later one), so all three fit between the hearts and the page's edge.
+     */
     private void tabs() {
+        // key, label, art, tilt, label nudge, art height, columns kept, carry on from
         Object[][] t = {
-                {"map", "Map", "tab_map", -1.5f, 230f, 2f, 112f},
-                {"items", "Items", "tab_items", 0.8f, 272f, -3f, 114f},
-                {"room", "Room", "tab_room", -0.7f, 268f, 4f, 122f}};
-        float x = 355;
+                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 68, 90},
+                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 57, 100},
+                {"room", "Room", "tab_room", -0.7f, 4f, 122f, 59, 100}};
+        float x = TABS_X;
         for (Object[] tab : t) {
             final String key = (String) tab[0];
-            float w = (Float) tab[4], h = (Float) tab[6], dy = (Float) tab[5];
+            String art = (String) tab[2];
+            int[] size = p.size(art);
+            if (size == null) continue;
+            int keep = (Integer) tab[6], from = (Integer) tab[7];
+            float w = (keep + size[0] - from) * 2, h = (Float) tab[5], dy = (Float) tab[4];
             boolean active = key.equals(ui.tab);
-            float y = 140 + (active ? 0 : 16);
+            float y = TABS_Y + (active ? 0 : 16);
             p.save();
             p.rotate((Float) tab[3], x + w / 2f, y + h / 2f);
             if (!active) p.brightness(0.55f);
-            p.sprite((String) tab[2], x, y, 2, 1f);
-            centered(Face.SMALL, 75, 75, (String) tab[1], x, y + (h - 75) / 2f + dy, w, INK);
+            p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
+            p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
+            centered(Face.SMALL, 70, 70, (String) tab[1], x, y + (h - 70) / 2f + dy, w, INK);
             p.restore();
             ui.hit(x, y, w, h, () -> ui.tab = key);
-            x += w + 12;
+            x += w + 10;
         }
     }
 }

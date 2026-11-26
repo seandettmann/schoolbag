@@ -41,20 +41,19 @@ final class TabMap {
         }
     }
 
-    // The Map tab's page gives the map more room than the other tabs: the big
-    // sheet is GROW game pixels taller (a band of its middle repeated) and the
-    // strip under it as much shorter (a band of its middle left out).
-    static final int GROW = 22;
+    // The Map tab's page gives the map more room than the other tabs: its big
+    // sheet is GROW game pixels taller, and the strip under it only needs two
+    // lines, so it gives back the difference (every page is Hud.EXTRA taller).
+    static final int GROW = 40;
     static final float SHEET_BOTTOM = (178 + GROW) * 3;        // where the strip starts
     static final float MAP_CX = 475, MAP_CY = 268 + GROW * 1.5f, MAP_W = 780, MAP_H = 432 + GROW * 3;
+    // the biggest zoom for the rooms (9 x 8 game pixels a cell): small floors fill the sheet
+    static final int MAP_ZOOM = 14;
+    // how far the sheet's centre moved down since the first layout, for the loading and death pictures
+    static final float DOWN = (GROW - 22) * 1.5f;
 
     static void page(Painter p) {
-        p.spritePart("paper_blank", 0, 0, 320, 100, 0, 0, 3, 1f);
-        for (int done = 0; done < GROW; done += 40)
-            p.spritePart("paper_blank", 0, 60, 320, Math.min(40, GROW - done), 0, (100 + done) * 3, 3, 1f);
-        p.spritePart("paper_blank", 0, 100, 320, 78, 0, (100 + GROW) * 3, 3, 1f);
-        p.spritePart("paper_blank", 0, 178, 320, 30, 0, (178 + GROW) * 3, 3, 1f);
-        p.spritePart("paper_blank", 0, 208 + GROW, 320, 272 - 208 - GROW, 0, (208 + GROW) * 3, 3, 1f);
+        Hud.page(p, "paper_blank", GROW, GROW - Hud.EXTRA);
     }
 
     static void draw(Hud h, Json.J s, Json.J player) {
@@ -69,20 +68,22 @@ final class TabMap {
             dead(h, player);
         } else if (loading) {
             boolean a = (h.now() / 350) % 2 == 0;
-            p.sprite(a ? "load_a" : "load_b", 368, 60, 2, 1f);
-            h.centered(Face.TITLE, Hud.NAME, Hud.NAME, "Loading...", 0, 356, 960, Hud.INK);
-            String leaving = Floors.name(w, s.get("floor"), false);
-            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, "Leaving " + leaving, 0, 436, 960, Hud.GREY);
+            p.sprite(a ? "load_a" : "load_b", 368, 60 + DOWN, 2, 1f);
+            h.centered(Face.TITLE, Hud.NAME, Hud.NAME, "Loading...", 0, 356 + DOWN, 960, Hud.INK);
+            String leaving = s.get("run").get("difficulty").integer() >= 2
+                    ? Floors.greedName(w, s.get("floor")) : Floors.name(w, s.get("floor"), false);
+            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, "Leaving " + leaving, 0, 436 + DOWN, 960, Hud.GREY);
         } else if (map.get("hidden").bool()) {
-            p.sprite("map_question", 336, 36, 9, 1f);
+            p.sprite("map_question", 336, 36 + DOWN, 9, 1f);
             String why = map.get("hiddenReason").str().equals("lost")
                     ? "Curse of the Lost: the map returns next floor" : "The map is hidden for now";
-            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, why, 64, 352, 832, Hud.INK);
+            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, why, 64, 352 + DOWN, 832, Hud.INK);
         } else {
             box = rooms(h, map);
         }
         if (box == null || !overlaps(box, 790, 44, 102, 58)) p.sprite("wm_spider", 790, 44, 2, 0.14f);
-        if (box == null || !overlaps(box, 48, 438, 130, 85)) p.sprite("doodle_038", 48, 438, 1, 0.13f);
+        float dy = SHEET_BOTTOM - 162;
+        if (box == null || !overlaps(box, 48, dy, 130, 85)) p.sprite("doodle_038", 48, dy, 1, 0.13f);
         strip(h, player);
     }
 
@@ -109,7 +110,7 @@ final class TabMap {
         }
         int cols = maxX - minX + 1, rows = maxY - minY + 1;
         int ms = 3;
-        for (int c = 9; c >= 3; c--) {
+        for (int c = MAP_ZOOM; c >= 3; c--) {
             if (cols * 9 * c <= MAP_W && rows * 8 * c <= MAP_H) { ms = c; break; }
         }
         float mapW = cols * 9 * ms, mapH = rows * 8 * ms;
@@ -165,16 +166,17 @@ final class TabMap {
         double t = (h.now() % 2400) / 2400.0;
         float bob = (float) (-12 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t)));
         boolean a = (h.now() / 350) % 2 == 0;
-        p.sprite(a ? "ghost_a" : "ghost_b", 391, 64 + bob, 3, 1f);
+        p.sprite(a ? "ghost_a" : "ghost_b", 391, 64 + DOWN + bob, 3, 1f);
         String who = h.words().text(player.get("name").str());
         if (who.isEmpty()) who = "Isaac";
-        h.centered(Face.TITLE, 64, 64, who + " died...", 0, 368, 960, Hud.INK);
+        h.centered(Face.TITLE, 64, 64, who + " died...", 0, 368 + DOWN, 960, Hud.INK);
     }
 
     /**
-     * The strip under the map: the pocket across the whole first line (name,
-     * then its line in grey), the trinkets side by side on the second. No
-     * headings: the pictures say which is which.
+     * The strip under the map: the pocket across the whole first line (its name;
+     * a pill's good, bad or horse in grey after it), the trinkets side by side on
+     * the second. No headings: the pictures say which is which. Cards and runes
+     * show only their names: their descriptions crowded the line.
      */
     private static void strip(Hud h, Json.J player) {
         Painter p = h.p();
@@ -214,7 +216,6 @@ final class TabMap {
                 int id = first.get("id").integer();
                 p.sprite(Cards.region(id), x0, top + 8, 2, 1f);
                 name = w.text(first.get("name").str());
-                line = w.cardQuote(id);
             }
             float nx = x0 + 32 + 14;
             String shown = h.fit(Face.SMALL, Hud.BODY, name, full - 46);

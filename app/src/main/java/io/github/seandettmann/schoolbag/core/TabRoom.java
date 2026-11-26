@@ -10,7 +10,7 @@ final class TabRoom {
         Painter p = h.p();
         Ui ui = h.ui();
         Words w = h.words();
-        p.sprite("paper_blank", 0, 0, 3, 1f);
+        Hud.page(p, "paper_blank", Hud.EXTRA, 0);
         p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
         Json.J room = s.get("room");
         int type = room.get("type").integer();
