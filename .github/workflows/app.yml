@@ -5,22 +5,22 @@
 # - A push to main makes a test build: a pre-release "vX.Y.Z-test.N" that
 #   replaces the one before it, so only the newest is ever there. Obtainium
 #   skips pre-releases unless "Include prereleases" is on.
-# - A pushed tag "vX.Y.Z" (matching versionName in app/build.gradle) makes
-#   the release "Schoolbag X.Y", with that version's section of CHANGELOG.md
-#   as its notes, and removes the test builds toward it.
+# - Run by hand with the task "release", it makes the release "Schoolbag X.Y"
+#   (tag vX.Y.Z, from versionName in app/build.gradle) from main, with that
+#   version's section of CHANGELOG.md as its notes, and removes the test
+#   builds toward it.
 name: App
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
-    paths: ['app/**', '.github/workflows/app.yml'] # (tags always build)
+    paths: ['app/**', '.github/workflows/app.yml']
   workflow_dispatch:
     inputs:
       task:
         description: What to run
         type: choice
-        options: [build, tidy-releases]
+        options: [build, release, tidy-releases]
         default: build
 
 permissions:
@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.task == 'build'
+    if: github.event_name != 'workflow_dispatch' || inputs.task != 'tidy-releases'
     runs-on: ubuntu-latest
     env:
       VERSION_CODE: ${{ github.run_number }}
@@ -43,21 +43,22 @@ jobs:
         id: version
         env:
           GH_TOKEN: ${{ github.token }}
+          TASK: ${{ inputs.task || 'build' }}
         run: |
           VERSION=$(sed -n "s/.*versionName[( ]*'\([0-9.]*\)'.*/\1/p" app/build.gradle)
           if [ -z "$VERSION" ]; then echo "::error::No versionName in app/build.gradle"; exit 1; fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
-              echo "::error::The tag $GITHUB_REF_NAME doesn't match the app's version $VERSION (app/build.gradle)."; exit 1
-            fi
+          # a version is out once a release (not a test build) has its name
+          if gh api "repos/$GITHUB_REPOSITORY/releases" --paginate -q '.[] | select(.prerelease | not) | .name' \
+              | grep -xF "Schoolbag ${VERSION%.0}" > /dev/null; then
+            echo "::error::Schoolbag $VERSION is already out. Raise versionName in app/build.gradle for the next version."; exit 1
+          fi
+          if [ "$TASK" = release ]; then
+            if [ "$GITHUB_REF_NAME" != main ]; then echo "::error::Releases are made from main."; exit 1; fi
             awk -v v="## $VERSION" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md | sed '/./,$!d' > notes.md
             if [ ! -s notes.md ]; then echo "::error::CHANGELOG.md has no section \"## $VERSION\"."; exit 1; fi
             echo "kind=release" >> "$GITHUB_OUTPUT"
           else
-            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" > /dev/null 2>&1; then
-              echo "::error::Schoolbag $VERSION is already out. Raise versionName in app/build.gradle for the next version's test builds."; exit 1
-            fi
             echo "VERSION_SUFFIX=-test.${{ github.run_number }}" >> "$GITHUB_ENV"
             echo "kind=test" >> "$GITHUB_OUTPUT"
           fi
@@ -149,7 +150,7 @@ jobs:
           if [ "$KIND" = "release" ]; then
             APK=schoolbag-$VERSION.apk
             cp "$BUILT" "$APK"
-            gh release create "v$VERSION" "$APK" --verify-tag --title "Schoolbag ${VERSION%.0}" --notes-file notes.md --latest
+            gh release create "v$VERSION" "$APK" --target "$GITHUB_SHA" --title "Schoolbag ${VERSION%.0}" --notes-file notes.md --latest
             for t in $(tests "^v${VERSION//./\\.}-test\\."); do gh release delete "$t" --yes --cleanup-tag; done
           else
             TAG="v$VERSION-test.$N"
@@ -165,10 +166,12 @@ jobs:
           fi
 
   # One-off: the test builds of 0.1.0 and 0.2.0 were published as releases
-  # ("app-v0.1.0-2" ... "app-v0.2.0-9"). This keeps the last build of each
-  # version as its release (v0.1.0, v0.2.0, with CHANGELOG.md's notes) and
-  # deletes the rest, with their tags. Run it from the Actions tab: App, Run
-  # workflow, task "tidy-releases". Safe to run again.
+  # ("app-v0.1.0-2" ... "app-v0.2.0-9"). This deletes the earlier builds with
+  # their tags, and makes the last build of each version its release: titled
+  # "Schoolbag 0.1" / "Schoolbag 0.2", with CHANGELOG.md's notes and the APK
+  # named for the version. Those two keep their tags (the build's token can't
+  # tag an older commit whose workflow files differ from today's). Run it from
+  # the Actions tab: App, Run workflow, task "tidy-releases". Safe to run again.
   tidy-releases:
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'tidy-releases'
     runs-on: ubuntu-latest
@@ -184,25 +187,14 @@ jobs:
           for n in 2 3 4 5 6 7; do
             if exists "app-v0.1.0-$n"; then gh release delete "app-v0.1.0-$n" --yes --cleanup-tag; fi
           done
-          promote() { # old tag, version, whether it's the latest release
-            old=$1 version=$2 latest=$3
-            if ! exists "$old"; then echo "$old is gone already"; return; fi
-            if ! exists "v$version"; then
-              # the tag v$version is pushed beforehand, on the build's commit:
-              # this token can't make a tag on a commit whose workflow files
-              # differ from today's
-              if ! gh api "repos/$R/git/ref/tags/v$version" > /dev/null 2>&1; then
-                echo "::error::Push the tag v$version (on $old's commit) first."; exit 1
-              fi
-              rm -rf dl && mkdir dl
-              gh release download "$old" --dir dl --pattern '*.apk'
-              mv dl/*.apk "dl/schoolbag-$version.apk"
-              awk -v v="## $version" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md | sed '/./,$!d' > notes.md
-              if [ ! -s notes.md ]; then echo "::error::CHANGELOG.md has no section for $version"; exit 1; fi
-              gh release create "v$version" "dl/schoolbag-$version.apk" --verify-tag \
-                --title "Schoolbag ${version%.0}" --notes-file notes.md --latest="$latest"
-            fi
-            gh release delete "$old" --yes --cleanup-tag
+          keep() { # tag, version
+            tag=$1 version=$2
+            if ! exists "$tag"; then echo "::warning::$tag isn't there"; return; fi
+            awk -v v="## $version" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md | sed '/./,$!d' > notes.md
+            if [ ! -s notes.md ]; then echo "::error::CHANGELOG.md has no section for $version"; exit 1; fi
+            gh release edit "$tag" --title "Schoolbag ${version%.0}" --notes-file notes.md
+            id=$(gh api "repos/$R/releases/tags/$tag" -q '.assets[0].id')
+            gh api -X PATCH "repos/$R/releases/assets/$id" -f name="schoolbag-$version.apk" > /dev/null
           }
-          promote app-v0.1.0-8 0.1.0 false
-          promote app-v0.2.0-9 0.2.0 true
+          keep app-v0.1.0-8 0.1.0
+          keep app-v0.2.0-9 0.2.0

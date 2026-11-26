@@ -203,9 +203,9 @@ and `VERSION` in `mod/schoolbag/main.lua` (also in its `metadata.xml`). From
 0.3 on, the app and the mod share the middle number. The first change after a
 release raises the version. Every push to `main` that touches `app/` makes a
 test build, a pre-release that replaces the one before. To release: write the
-version's section in `CHANGELOG.md`, then push the tag `vX.Y.Z`; the build
-publishes "Schoolbag X.Y" with that section as its notes and removes the test
-builds toward it.
+version's section in `CHANGELOG.md`, then run the App workflow (Actions tab)
+with the task `release`; it publishes "Schoolbag X.Y" (tag `vX.Y.Z`) from
+`main` with that section as its notes and removes the test builds toward it.
 
 **Uploading to the Workshop (Windows):** copy `mod/schoolbag` into the game's
 `mods` folder, run the game's `tools/ModUploader/ModUploader.exe` and choose
