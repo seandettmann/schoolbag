@@ -73,7 +73,7 @@ final class TabItems {
         }
 
         // the card for the selected item
-        if (selIndex >= 0) {
+        if (selIndex >= 0 && !dead) { // after a death the strip is left blank
             Cell c = cells.get(selIndex);
             h.itemCard(c.id, c.name, false, detail, "Tap here again for all your items", () -> ui.detail = !ui.detail);
         }

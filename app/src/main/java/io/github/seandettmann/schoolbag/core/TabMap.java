@@ -80,7 +80,7 @@ final class TabMap {
         if (box == null || !overlaps(box, 790, 44, 102, 58)) p.sprite("wm_spider", 790, 44, 2, 0.14f);
         float dy = SHEET_BOTTOM - 162;
         if (box == null || !overlaps(box, 48, dy, 130, 85)) p.sprite("doodle_038", 48, dy, 1, 0.13f);
-        strip(h, player);
+        if (!dead(s)) strip(h, player); // after a death the strip is left blank
     }
 
     private static boolean overlaps(float[] m, float bx, float by, float bw, float bh) {

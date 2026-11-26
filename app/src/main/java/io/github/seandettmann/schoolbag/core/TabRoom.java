@@ -13,13 +13,8 @@ final class TabRoom {
         Hud.page(p, "paper_blank", Hud.EXTRA, 0);
         Json.J room = s.get("room");
         if (TabMap.dead(s)) {
-            // the run is over: the death picture, and the item in front of you, if there was one
+            // the run is over: the death picture, and the strip left blank
             TabMap.ghost(h, player, TabMap.DOWN_SHORT);
-            List<Json.J> peds = room.get("pedestals").items();
-            if (!peds.isEmpty()) {
-                Json.J sel = peds.get(Math.min(ui.roomSel, peds.size() - 1));
-                h.itemCard(sel.get("id").integer(), sel.get("name").str(), sel.get("blind").bool(), false, "", () -> {});
-            }
             return;
         }
         p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
