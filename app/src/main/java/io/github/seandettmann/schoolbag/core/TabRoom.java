@@ -69,7 +69,7 @@ final class TabRoom {
         int from = first * Hud.GRID_COLS, to = Math.min(peds.size(), (first + Hud.GRID_ROWS) * Hud.GRID_COLS);
         int row0 = g0 / Hud.GRID_COLS;
         if (group > 0 && g1 > g0 && g1 / Hud.GRID_COLS == row0 && g0 >= from && g1 < to) {
-            float lx = Hud.GRID_LEFT + (g0 % Hud.GRID_COLS) * Hud.GRID_STEP_X - 22, ly = 122 + (row0 - first) * Hud.GRID_STEP_Y;
+            float lx = 84 + (g0 % Hud.GRID_COLS) * Hud.GRID_STEP_X - 22, ly = 122 + (row0 - first) * Hud.GRID_STEP_Y;
             p.sprite("loop2", lx, ly, 3, 1f);
             // "Take one" under the loop, unless another row of items is there
             if (rows == 1) h.centered(Face.SMALL, 48, 48, "Take one", lx, 302, 261, Hud.INK);
@@ -77,7 +77,7 @@ final class TabRoom {
         for (int i = from; i < to; i++) {
             Json.J ped = peds.get(i);
             int k = i - from;
-            float x = Hud.GRID_LEFT + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = 146 + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
+            float x = 84 + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = 146 + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
             if (i == ui.roomSel) {
                 p.rect(x - 5, y - 5, 106, 4, Hud.INK);
                 p.rect(x - 5, y - 5 + 101, 106, 4, Hud.INK);
@@ -88,9 +88,9 @@ final class TabRoom {
             else h.itemCell("items", ped.get("id").integer(), x, y, 3, 1f);
             h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
             final int index = i;
-            ui.hit(Hud.MX + x - 10, Hud.MY + y - 5, Hud.GRID_STEP_X, 127, () -> { ui.roomSel = index; ui.roomDetail = false; });
+            ui.hit(Hud.MX + x - 12, Hud.MY + y - 5, 120, 127, () -> { ui.roomSel = index; ui.roomDetail = false; });
         }
-        h.gridScroll(rows, first, 146);
+        h.gridScroll(rows, first, 84);
         Json.J sel = peds.get(ui.roomSel);
         boolean blind = sel.get("blind").bool();
         h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, ui.roomDetail,

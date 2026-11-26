@@ -185,77 +185,60 @@ final class TabMap {
         h.centered(Face.TITLE, 64, 64, who + " died...", 0, GHOST_TOP + 304, 960, Hud.INK);
     }
 
-    // The strip under the map, between its torn edges, and where its two halves meet.
+    // The strip under the map, between its torn edges, and the middle of its height.
+    // Each half holds at most half the strip: trinkets from the left, the pocket from the right.
     static final float STRIP_X0 = 66, STRIP_X1 = 855, STRIP_MID = (SHEET_BOTTOM + 826) / 2f;
-    static final float STRIP_SPLIT = STRIP_X0 + 0.45f * (STRIP_X1 - STRIP_X0);
+    static final float STRIP_HALF = (STRIP_X0 + STRIP_X1) / 2f;
 
     /**
-     * The strip under the map, as two small cards side by side, where the game's
-     * HUD has them. The trinkets on the left, a line each. The pocket on the
-     * right: its picture, its name and, in grey under it, a pill's good, bad or
-     * horse and what's next in the pocket (or Tainted Cain's bag, in two rows).
-     * No headings: the pictures say which is which.
+     * The strip under the map, where the game's HUD has these: the trinkets from
+     * the left, the pocket mirrored from the right. One thing on a side shows at
+     * 3x with its name beside it (towards the middle); two show side by side at
+     * 3x with no names. A pill's good, bad or horse is in grey under its name.
+     * Tainted Cain's bag sits on the right, in two rows. No headings: the
+     * pictures say which is which.
      */
     private static void strip(Hud h, Json.J player) {
         Painter p = h.p();
         Words w = h.words();
-        float cy = STRIP_MID, x0 = STRIP_SPLIT + 16, right = STRIP_X1;
+        float cy = STRIP_MID, gap = 24;
 
-        // the trinkets, one a line
+        // the trinkets, from the left
         List<Json.J> trinkets = player.get("trinkets").items();
         if (trinkets.isEmpty()) {
             h.text(Face.SMALL, 44, 48, "No trinkets", STRIP_X0, cy - 24, Hud.NUMGREY);
         } else if (trinkets.size() == 1) {
-            // one trinket: at 3x, the size of the pocket's picture, its name beside it
             Json.J t = trinkets.get(0);
+            float pw = trinket(h, t.get("id").integer(), STRIP_X0, cy, false);
             String name = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
-            int id = t.get("id").integer();
-            int[] b = p.pictureBounds("trinkets", id);
-            float pw = b == null ? 96 : Math.min(96, b[2] * 3), ph = b == null ? 96 : Math.min(96, b[3] * 3);
-            h.item("trinkets", id, STRIP_X0, cy - ph / 2f, pw, ph, 3, 1f, false);
-            float tx = STRIP_X0 + pw + 16, tw = STRIP_SPLIT - 16 - tx;
-            List<String> lines = h.wrap(Face.SMALL, 40, name, tw); // a long name takes two lines
-            int n = Math.min(lines.size(), 2);
-            for (int i = 0; i < n; i++) {
-                String line = i == 1 && lines.size() > 2 ? h.fit(Face.SMALL, 40, lines.get(1) + " " + lines.get(2), tw) : lines.get(i);
-                h.text(Face.SMALL, 40, 48, line, tx, cy - n * 24 + i * 48, Hud.INK);
-            }
+            float tx = STRIP_X0 + pw + 16;
+            nameLines(h, name, null, Hud.INK, tx, STRIP_HALF - 12 - tx, cy, false);
         } else {
-            // two: at 2x, a line each (two at 3x don't fit the strip's height)
-            int n = Math.min(trinkets.size(), 2);
-            float rowH = 68, y = cy - n * rowH / 2f;
-            for (int i = 0; i < n; i++) {
-                Json.J t = trinkets.get(i);
-                String name = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
-                p.picture("trinkets", t.get("id").integer(), STRIP_X0, y + 2, 2, 1f, false);
-                h.text(Face.SMALL, 40, 48, h.fit(Face.SMALL, 40, name, STRIP_SPLIT - 16 - STRIP_X0 - 72), STRIP_X0 + 72, y + 12, Hud.INK);
-                y += rowH;
-            }
+            float pw = trinket(h, trinkets.get(0).get("id").integer(), STRIP_X0, cy, false);
+            trinket(h, trinkets.get(1).get("id").integer(), STRIP_X0 + pw + gap, cy, false);
         }
 
-        // the pocket (or Tainted Cain's bag)
+        // the pocket (or Tainted Cain's bag), from the right
         Json.J bag = player.get("bag");
         List<Json.J> pockets = player.get("pockets").items();
         if (bag.exists()) {
             List<Json.J> its = bag.get("items").items();
-            float step = 36, top = cy - (2 * step - 4) / 2f;
+            float step = 36, top = cy - (2 * step - 4) / 2f, left = STRIP_X1 - (4 * step - 4);
             for (int i = 0; i < 8; i++) {
                 String r = i < its.size() ? "cr-" + its.get(i).integer() : "cr-empty";
-                p.sprite(r, x0 + (i % 4) * step, top + (i / 4) * step, 2, 1f);
+                p.sprite(r, left + (i % 4) * step, top + (i / 4) * step, 2, 1f);
             }
         } else if (pockets.isEmpty()) {
-            h.text(Face.SMALL, 44, 48, "Empty pocket", x0, cy - 24, Hud.NUMGREY);
-        } else {
-            Json.J first = pockets.get(0);
+            String t = "Empty pocket";
+            h.text(Face.SMALL, 44, 48, t, STRIP_X1 - p.width(Face.SMALL, 44, t), cy - 24, Hud.NUMGREY);
+        } else if (pockets.size() == 1) {
+            Json.J it = pockets.get(0);
+            pocket(h, it, STRIP_X1 - 48, cy);
             String name, note = "";
             int color = Hud.INK;
-            float px = x0, py = cy - 36;                 // a 48 x 72 box: a card front at 3x
-            if (first.get("kind").str().equals("pill")) {
-                String r = "pill-" + (first.get("color").integer() & 2047);
-                int[] s = p.size(r);
-                if (s != null) p.sprite(r, px + (48 - s[0] * 3) / 2f, py + (72 - s[1] * 3) / 2f, 3, 1f);
-                if (first.get("identified").bool()) {
-                    int eff = first.get("effect").integer();
+            if (it.get("kind").str().equals("pill")) {
+                if (it.get("identified").bool()) {
+                    int eff = it.get("effect").integer();
                     name = w.text(pillName(h, player, eff));
                     String cls = w.pillClass(eff);
                     note = cls.equals("+") ? "Good pill" : cls.equals("-") ? "Bad pill" : "";
@@ -263,26 +246,59 @@ final class TabMap {
                     name = "???";
                     color = Hud.NUMGREY;
                 }
-                if ((first.get("color").integer() & 2048) != 0) note = note.isEmpty() ? "Horse pill" : note + ", horse pill";
+                if ((it.get("color").integer() & 2048) != 0) note = note.isEmpty() ? "Horse pill" : note + ", horse pill";
             } else {
-                Cards.draw(p, first.get("id").integer(), px, py, 3);
-                name = w.text(first.get("name").str());
+                name = w.text(it.get("name").str());
             }
-            if (pockets.size() > 1) {
-                String next = nameOf(h, player, pockets.get(1));
-                note = note.isEmpty() ? "Then " + next : note + ", then " + next;
-            }
-            float tx = x0 + 48 + 20, tw = right - tx, th = note.isEmpty() ? 54 : 54 + 44;
-            h.text(Face.TITLE, 48, 54, h.fit(Face.TITLE, 48, name, tw), tx, cy - th / 2f, color);
-            if (!note.isEmpty()) h.text(Face.SMALL, 38, 44, h.fit(Face.SMALL, 38, note, tw), tx, cy - th / 2f + 54, Hud.GREY);
+            float tr = STRIP_X1 - 48 - 16;
+            nameLines(h, name, note, color, tr, tr - (STRIP_HALF + 12), cy, true);
+        } else {
+            pocket(h, pockets.get(0), STRIP_X1 - 48, cy);
+            pocket(h, pockets.get(1), STRIP_X1 - 48 - gap - 48, cy);
         }
     }
 
-    /** A pocket item's name: a card's, an identified pill's, or ??? for a pill not yet known. */
-    private static String nameOf(Hud h, Json.J player, Json.J it) {
-        if (!it.get("kind").str().equals("pill")) return h.words().text(it.get("name").str());
-        if (!it.get("identified").bool()) return "???";
-        return h.words().text(pillName(h, player, it.get("effect").integer()));
+    /** A trinket at 3x (trimmed), its left at x (or its right, mirrored), centred on cy; returns its width. */
+    private static float trinket(Hud h, int id, float x, float cy, boolean fromRight) {
+        int[] b = h.p().pictureBounds("trinkets", id);
+        float pw = b == null ? 96 : Math.min(96, b[2] * 3), ph = b == null ? 96 : Math.min(96, b[3] * 3);
+        h.item("trinkets", id, fromRight ? x - pw : x, cy - ph / 2f, pw, ph, 3, 1f, false);
+        return pw;
+    }
+
+    /** A pocket card or pill at 3x, in a card front's box (48 x 72) with its left at x, centred on cy. */
+    private static void pocket(Hud h, Json.J it, float x, float cy) {
+        Painter p = h.p();
+        float py = cy - 36;
+        if (it.get("kind").str().equals("pill")) {
+            String r = "pill-" + (it.get("color").integer() & 2047);
+            int[] s = p.size(r);
+            if (s != null) p.sprite(r, x + (48 - s[0] * 3) / 2f, py + (72 - s[1] * 3) / 2f, 3, 1f);
+        } else {
+            Cards.draw(p, it.get("id").integer(), x, py, 3);
+        }
+    }
+
+    /**
+     * A name beside a picture on the strip, on up to two lines, with an optional
+     * grey note under it, centred on cy. Left-aligned from x, or right-aligned
+     * to x when mirrored (the pocket's side).
+     */
+    private static void nameLines(Hud h, String name, String note, int color, float x, float width, float cy, boolean mirrored) {
+        List<String> lines = h.wrap(Face.SMALL, 40, name, width);
+        int n = Math.min(lines.size(), 2);
+        if (lines.size() > 2) lines.set(1, h.fit(Face.SMALL, 40, lines.get(1) + " " + lines.get(2), width));
+        boolean hasNote = note != null && !note.isEmpty();
+        float total = n * 48 + (hasNote ? 40 : 0), y = cy - total / 2f;
+        for (int i = 0; i < n; i++) {
+            String l = lines.get(i);
+            h.text(Face.SMALL, 40, 48, l, mirrored ? x - h.p().width(Face.SMALL, 40, l) : x, y, color);
+            y += 48;
+        }
+        if (hasNote) {
+            String l = h.fit(Face.SMALL, 34, note, width);
+            h.text(Face.SMALL, 34, 40, l, mirrored ? x - h.p().width(Face.SMALL, 34, l) : x, y, Hud.GREY);
+        }
     }
 
     private static String pillName(Hud h, Json.J player, int effect) {

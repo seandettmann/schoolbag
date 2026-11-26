@@ -64,16 +64,16 @@ final class TabItems {
             h.itemDetail(cells.get(selIndex).id, GRID_TOP + 8);
         } else {
             // 7 across at 3x, three rows in view; past that the grid scrolls (newest rows
-            // first, until you scroll), with arrows and a bar in a column at its right
+            // first, until you scroll), with an arrow under it
             int rows = (cells.size() + Hud.GRID_COLS - 1) / Hud.GRID_COLS;
             int most = Math.max(0, rows - Hud.GRID_ROWS);
             int first = ui.itemsRow < 0 ? most : Math.min(ui.itemsRow, most);
             for (int i = first * Hud.GRID_COLS; i < cells.size() && i < (first + Hud.GRID_ROWS) * Hud.GRID_COLS; i++) {
                 int k = i - first * Hud.GRID_COLS;
-                float x = Hud.GRID_LEFT + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = GRID_TOP + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
+                float x = 54 + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = GRID_TOP + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
                 cell(h, cells.get(i), i, selIndex, x, y, 3);
             }
-            h.gridScroll(rows, first, GRID_TOP);
+            h.gridScroll(rows, first, 54);
         }
 
         // the card for the selected item
@@ -107,8 +107,8 @@ final class TabItems {
         if (zoom == 3) h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
         else h.text(Face.SMALL, 30, 30, String.valueOf(i + 1), x + 2, y + 64, Hud.NUMGREY);
         final int index = i;
-        // the whole cell, gaps included (116 x 126 at 3x, 80 x 96 at 2x)
-        ui.hit(Hud.MX + x - (zoom == 3 ? 10 : 8), Hud.MY + y - 5, zoom == 3 ? Hud.GRID_STEP_X : 80, zoom == 3 ? 126 : 96, () -> {
+        // the whole cell, gaps included (120 x 126 at 3x, 80 x 96 at 2x)
+        ui.hit(Hud.MX + x - (zoom == 3 ? 12 : 8), Hud.MY + y - 5, zoom == 3 ? 120 : 80, zoom == 3 ? 126 : 96, () -> {
             ui.sel = index;
             ui.selKind = "run";
             ui.detail = false;

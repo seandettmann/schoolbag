@@ -14,10 +14,11 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   lines instead of running off the page.
 - The tabs stay where they are when you switch: the open one is bright,
   with a pencil line under its label, and the others are dimmed.
-- The strip under the map is two small cards side by side, where the game's
-  HUD has them: your trinkets on the left, one a line, and your pocket on
-  the right (with what's next in it, in grey). One trinket is drawn at full
-  size, like the pocket; two stay a size smaller to fit the strip.
+- The strip under the map has your trinkets on the left and your pocket on
+  the right, where the game's HUD has them, each in at most half the strip.
+  One thing on a side shows at full size with its name beside it, towards
+  the middle (a pill's good, bad or horse in grey under its name); two show
+  side by side at full size, without names.
 - On the Items and Room tabs, the card shows the item bigger, with just its
   name and pickup line. Tap it for the full description, as before.
 - Between floors the Map tab keeps showing the map, instead of a loading
@@ -31,9 +32,10 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
 - "My Stuff!" sits a little lower on the Items tab, clear of the paper's
   top edge, with the items under it.
 - The Items and Room tabs both show 7 items a row at full size. Past three
-  rows (21 items), swipe up or down on the page to scroll, or tap the arrows
-  at the grid's right. The Items tab shows the newest rows until you scroll,
-  and a Room with more than 7 pedestals now shows them all.
+  rows (21 items), an arrow near the bottom of the page scrolls down a row
+  at a time, and points up at the end to go back to the top; a swipe up or
+  down on the page scrolls too. The Items tab shows the newest rows until
+  you scroll, and a Room with more than 7 pedestals now shows them all.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,
