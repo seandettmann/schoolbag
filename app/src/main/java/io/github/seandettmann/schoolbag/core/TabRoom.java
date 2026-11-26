@@ -12,10 +12,12 @@ final class TabRoom {
         Words w = h.words();
         Hud.page(p, "paper_blank", Hud.EXTRA, 0);
         Json.J room = s.get("room");
-        // the Room tab's own pencil sketches, in three corners
-        p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
-        p.sprite("wm_face", 60, 500, 2, 0.14f);
-        p.sprite("doodle_030", 780, 500, 1, 0.13f);
+        // the Room tab's own pencil sketches (the angel and the poop join them with items in the room)
+        h.sketch("wm_mushroom", 800, 40, 2);
+        h.sketch("doodle_001", 815, 150, 1);
+        h.sketch("wm_face", 60, 500, 2);
+        h.sketch("doodle_039", 240, 490, 1);
+        h.sketch("doodle_030", 780, 500, 1);
         if (TabMap.dead(s)) {
             // the run is over: the death picture, and the strip left blank
             TabMap.ghost(h, player);
@@ -45,14 +47,14 @@ final class TabRoom {
         }
         if (ui.roomSel >= peds.size()) ui.roomSel = 0;
         if (ui.roomDetail && !peds.get(ui.roomSel).get("blind").bool()) {
-            h.itemDetail(peds.get(ui.roomSel).get("id").integer());
+            h.itemDetail(peds.get(ui.roomSel).get("id").integer(), 108);
             Json.J sel = peds.get(ui.roomSel);
             h.itemCard(sel.get("id").integer(), sel.get("name").str(), false, true,
                     "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
             return;
         }
-        p.sprite("doodle_033", 560, 300, 2, 0.13f);
-        p.sprite("wm_poop", 96, 380, 2, 0.14f);
+        h.sketch("doodle_033", 560, 300, 2);
+        h.sketch("wm_poop", 96, 380, 2);
         // items that share an options group: a pencil loop round them, "Take one" under it
         int g0 = -1, g1 = -1, group = 0;
         for (int i = 0; i < peds.size(); i++) {

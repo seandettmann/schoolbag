@@ -23,9 +23,11 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   picture.
 - When you die, the ghost shows on all three tabs, not just the Map, at the
   same spot on each, and the strips under them are left blank.
-- Each tab's page has its own faint pencil sketches from the game in its
-  corners: a key and a treasure chest join the Map's, a cat and a family
-  photo the Items tab's, a face and a die the Room tab's.
+- Each tab's page has its own set of the game's faint pencil sketches,
+  about seven a page, under the map and the items, which cover them where
+  they need the room.
+- "My Stuff!" sits a little lower on the Items tab, clear of the paper's
+  top edge, with the items under it.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,

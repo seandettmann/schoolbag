@@ -196,14 +196,22 @@ public final class Hud {
         if (!blind) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
     }
 
+    /**
+     * One of the game's faint pencil sketches on a page. Drawn before the page's
+     * content, so the map or the items cover it where they need the room.
+     */
+    void sketch(String region, float x, float y, int zoom) {
+        p.sprite(region, x, y, zoom, 0.13f);
+    }
+
     /** An item's full description, in the space above the card: the game's info lines, or its pickup line. */
-    void itemDetail(int id) {
+    void itemDetail(int id, float top) {
         List<String> lines = new ArrayList<>();
         for (Json.J l : w.lines(id)) lines.add(l.str());
         if (lines.isEmpty()) lines.add(w.quote("collectibles", id));
         p.save();
-        p.clip(60, 96, 830, 400 + EXTRA * 3);
-        float y = 108;
+        p.clip(60, top - 12, 830, 508 + EXTRA * 3 - top); // down to the sheet's bottom, as before
+        float y = top;
         for (String line : lines) {
             for (String l : wrap(Face.SMALL, DETAIL, line, 800)) {
                 text(Face.SMALL, DETAIL, 54, l, 72, y, INK);

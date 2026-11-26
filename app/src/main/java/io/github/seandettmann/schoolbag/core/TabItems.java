@@ -28,11 +28,18 @@ final class TabItems {
         return new ArrayList<>(byId.values());
     }
 
+    // how far "My Stuff!" sits below where the game's page has it (game pixels), and
+    // where the grid starts under it
+    static final int HEADING_DOWN = 6;
+    static final float GRID_TOP = 100 + HEADING_DOWN * 3;
+
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
         Ui ui = h.ui();
         Words w = h.words();
-        Hud.page(p, "paper", Hud.EXTRA, 0);
+        // the page without its "My Stuff!", which goes back on a little lower, clear of the top edge
+        Hud.page(p, "paper_blank", Hud.EXTRA, 0);
+        p.spritePart("paper", 45, 15, 69, 13, 45 * 3, (15 + HEADING_DOWN) * 3, 3, 1f);
         List<Cell> cells = cells(player);
         // a new item: jump to it
         if (cells.size() != ui.itemCountSeen) {
@@ -43,22 +50,24 @@ final class TabItems {
         boolean dead = TabMap.dead(s);
         boolean detail = ui.detail && selIndex >= 0 && !dead;
 
-        // the Items tab's own pencil sketches: under the grid's corners, but not under a description
-        if (!detail) {
-            p.sprite("wm_hanger", 772, 20, 2, 0.14f);
-            p.sprite("doodle_028", 40, 490, 1, 0.13f);
-            p.sprite("doodle_017", 812, 500, 1, 0.13f);
-        }
-        p.sprite("wm_bible", 790, 660 + Hud.EXTRA * 3, 2, 0.14f);
+        // the Items tab's own pencil sketches, under the items
+        h.sketch("wm_hanger", 772, 20, 2);
+        h.sketch("wm_isaac", 600, 12, 1);
+        h.sketch("doodle_022", 40, 250, 1);
+        h.sketch("doodle_009", 850, 230, 1);
+        h.sketch("wm_knife", 700, 430, 2);
+        h.sketch("doodle_028", 40, 490, 1);
+        h.sketch("doodle_017", 812, 500, 1);
+        h.sketch("wm_bible", 790, 660 + Hud.EXTRA * 3, 2);
 
         if (dead) {
             TabMap.ghost(h, player);
         } else if (detail) {
-            h.itemDetail(cells.get(selIndex).id);
+            h.itemDetail(cells.get(selIndex).id, GRID_TOP + 8);
         } else if (cells.size() <= 21) {
             // 7 across at 3x
             for (int i = 0; i < cells.size(); i++) {
-                float x = 54 + (i % 7) * 120, y = 100 + (i / 7) * 126;
+                float x = 54 + (i % 7) * 120, y = GRID_TOP + (i / 7) * 126;
                 cell(h, cells.get(i), i, selIndex, x, y, 3);
             }
         } else {
@@ -66,15 +75,15 @@ final class TabItems {
             int rows = (cells.size() + 9) / 10;
             int first = Math.max(0, rows - 4) * 10;
             p.save();
-            p.clip(62, 100, 808, 384);
+            p.clip(62, GRID_TOP, 808, 384);
             for (int i = first; i < cells.size(); i++) {
                 int k = i - first;
-                cell(h, cells.get(i), i, selIndex, 62 + (k % 10) * 80, 100 + (k / 10) * 96, 2);
+                cell(h, cells.get(i), i, selIndex, 62 + (k % 10) * 80, GRID_TOP + (k / 10) * 96, 2);
             }
             p.restore();
             float thumbH = Math.round(380f * 4 / rows);
-            p.rect(892, 104, 6, 380, 0xFFB8A27F);
-            p.rect(892, 104 + 380 - thumbH, 6, thumbH, 0xFF6B5A47);
+            p.rect(892, GRID_TOP + 4, 6, 380, 0xFFB8A27F);
+            p.rect(892, GRID_TOP + 4 + 380 - thumbH, 6, thumbH, 0xFF6B5A47);
         }
 
         // the card for the selected item

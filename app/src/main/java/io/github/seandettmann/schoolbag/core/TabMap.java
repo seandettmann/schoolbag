@@ -62,8 +62,15 @@ final class TabMap {
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
         page(p);
+        // the Map's own pencil sketches, under the map
+        h.sketch("wm_spider", 790, 40, 2);
+        h.sketch("doodle_026", 60, 36, 1);
+        h.sketch("doodle_023", 600, 24, 1);
+        h.sketch("doodle_031", 60, 270, 1);
+        h.sketch("wm_stick", 840, 250, 2);
+        h.sketch("doodle_038", 48, SHEET_BOTTOM - 162, 1);
+        h.sketch("doodle_045", 800, SHEET_BOTTOM - 154, 1);
         Json.J map = s.get("map");
-        float[] box = null;
         // between floors the map stays as it was until the next floor's arrives
         if (dead(s)) {
             ghost(h, player);
@@ -76,19 +83,9 @@ final class TabMap {
             for (int i = 0; i < lines.size() && i < 2; i++)
                 h.centered(Face.SMALL, Hud.BODY, Hud.BODY, lines.get(i), 64, 352 + DOWN + i * 64, 832, Hud.INK);
         } else {
-            box = rooms(h, map);
+            rooms(h, map);
         }
-        // the Map's own pencil sketches, one in each corner, each left out when the map needs its space
-        if (box == null || !overlaps(box, 790, 44, 102, 58)) p.sprite("wm_spider", 790, 44, 2, 0.14f);
-        if (box == null || !overlaps(box, 60, 36, 57, 90)) p.sprite("doodle_026", 60, 36, 1, 0.13f);
-        float dy = SHEET_BOTTOM - 162;
-        if (box == null || !overlaps(box, 48, dy, 130, 85)) p.sprite("doodle_038", 48, dy, 1, 0.13f);
-        if (box == null || !overlaps(box, 800, dy + 8, 95, 74)) p.sprite("doodle_045", 800, dy + 8, 1, 0.13f);
         if (!dead(s)) strip(h, player); // after a death the strip is left blank
-    }
-
-    private static boolean overlaps(float[] m, float bx, float by, float bw, float bh) {
-        return !(bx + bw + 16 < m[0] || bx > m[0] + m[2] + 16 || by + bh + 16 < m[1] || by > m[1] + m[3] + 16);
     }
 
     /** Draws the rooms; returns the map's box {x, y, w, h}. */
