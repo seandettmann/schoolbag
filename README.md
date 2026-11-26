@@ -39,7 +39,7 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
-- **Mod 0.1.0:** written and tested against a stand-in for the game's API
+- **Mod 0.2.0:** written and tested against a stand-in for the game's API
   (see `tests/`). Not yet tested in the real game.
 - **App:** not started yet. The design mock-ups are done.
 
@@ -139,9 +139,11 @@ lua5.3 tests/check_bag.lua       # tracking what goes into the Bag of Crafting
 folder, launch with `--luadebug`, start a run and open
 `http://127.0.0.1:8089/watch` in a browser (on the Thor, on the bottom
 screen). That test page reads the mod twice a second, like the app will, so
-the game's HUD stays hidden, and shows the values worth checking;
-`/state` is the raw data. The game's `log.txt` shows lines starting with
-`[Schoolbag]`.
+the game's HUD stays hidden, and shows the values worth checking. It also
+lists any **problems** (parts of the mod that failed) and the game calls that
+didn't answer, and its **Copy state** button copies all of it, with the full
+state, to paste into a chat or an issue. `/state` is the raw data. The game's
+`log.txt` also shows lines starting with `[Schoolbag]`.
 
 **Uploading to the Workshop (Windows):** copy `mod/schoolbag` into the game's
 `mods` folder, run the game's `tools/ModUploader/ModUploader.exe` and choose

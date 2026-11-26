@@ -92,6 +92,8 @@ def base_state():
         "inRun": True,
         "paused": False,
         "humans": 1,
+        "problems": [],
+        "misses": [],
         "run": {"seed": "ABCD EFGH", "difficulty": 0, "challenge": 0, "victoryLap": 0,
                 "timeFrames": 37260, "bossRushDone": False, "blueWombDone": False},
         "floor": {"stage": 2, "stageType": 0, "altPath": False, "name": "Basement II",
@@ -116,7 +118,7 @@ def scenario(name):
         pass
     elif name == "notinrun":
         return {"protocol": PROTOCOL, "mod": {"name": "Schoolbag", "version": "mock"},
-                "inRun": False, "paused": False}
+                "inRun": False, "paused": False, "problems": [], "misses": []}
     elif name == "paused":
         s["paused"] = True
     elif name == "lost":
@@ -234,6 +236,12 @@ def scenario(name):
         e["pockets"] = [{"slot": 0, "kind": "pill", "color": 3, "horse": False, "identified": False}]
         e["items"] = p["items"][2:4]
         s["players"].append(e)
+    elif name == "problems":
+        # what /watch shows when a part of the mod failed and some game calls didn't answer
+        s.pop("chances")
+        s["problems"] = ["chances failed: main.lua:957: attempt to index a nil value (local 'level')"]
+        s["misses"] = ["main.lua:558: attempt to call a nil value (method 'GetName')",
+                       "main.lua:960: attempt to call a nil value (method 'GetPlanetariumChance')"]
     elif name == "coop":
         # local co-op: a second person on controller 1, now a ghost; the mod leaves the HUD on
         s["humans"] = 2
@@ -250,7 +258,7 @@ def scenario(name):
 SCENARIOS = ["normal", "notinrun", "offline", "paused", "lost", "unknown", "blind", "loading",
              "dead", "active0", "active1", "greed", "challenge", "shields", "shieldsall",
              "bossrush", "hush", "devil", "emptyroom", "newitem", "pills", "tcain",
-             "tbluebaby", "forgotten", "mirror", "jacobesau", "coop"]
+             "tbluebaby", "forgotten", "mirror", "jacobesau", "coop", "problems"]
 
 
 class Handler(BaseHTTPRequestHandler):

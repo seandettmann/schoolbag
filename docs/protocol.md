@@ -16,7 +16,7 @@ device can reach it.
 | `GET /state` | The full state below, as JSON. Hides the game's HUD while the app keeps reading (below). |
 | `GET /state?hud=keep` | The same state, without hiding the game's HUD (the app's "Hide the game's HUD" setting turned off). If the HUD was hidden, it comes straight back. |
 | `GET /health` | `ok` (plain text). Cheap check that the mod is up. Doesn't hide the HUD. |
-| `GET /watch` | A test page for a browser on the device: reads `/state` twice a second (so the HUD stays hidden, as with the app) and shows the values worth checking. For trying the mod before the app exists. |
+| `GET /watch` | A test page for a browser on the device: reads `/state` twice a second (so the HUD stays hidden, as with the app) and shows the values worth checking, plus `problems` and `misses`. Its **Copy state** button copies a plain-text report (the summary, problems, misses and the full state) to paste into a chat or an issue. For trying the mod before the app exists. |
 | `POST /strings` | The game's words, from the app (below). Answers `ok <count>`, or `400` if the body isn't a JSON object. |
 | anything else | `404`. |
 
@@ -102,7 +102,8 @@ time without a bump, so the app must ignore fields it doesn't know.
   sent as `null`.
 - If one part of the state can't be read (for example after a game update
   renames something), that part is left out and the rest still arrives. The
-  mod logs the problem once to the game's `log.txt`.
+  mod logs the problem once to the game's `log.txt` and lists it in
+  `problems`.
 - **Names:** item, trinket, card and pill names are sent exactly as the game's
   item config holds them. For vanilla content that is usually a string key such
   as `#THE_SAD_ONION_NAME`, which the app looks up in `stringtable.sta`. Modded
@@ -130,7 +131,7 @@ The mod never sends what the game is hiding from the player:
 ```json
 {
   "protocol": 1,
-  "mod": { "name": "Schoolbag", "version": "0.1.0" },
+  "mod": { "name": "Schoolbag", "version": "0.2.0" },
   "inRun": true,
   "paused": false,
   "humans": 1,
@@ -152,6 +153,8 @@ The mod never sends what the game is hiding from the player:
 | `humans` | How many people are playing (one per controller). More than 1 is co-op, and the mod leaves the game's HUD on. |
 | `strings` | How many of the game's words the app has sent with `POST /strings`. 0 means send them. |
 | `hudHidden` | `true` while the mod is hiding the game's HUD. |
+| `problems` | For testing: parts of the mod that failed since the game started (a part of the state, a banner, the boss bar...), each once, at most 30. Empty when all is well. The app can ignore it. |
+| `misses` | For testing: game calls the mod tried that didn't answer, each once, at most 30. Often fine (not every call exists for every character or game version), but a surprise here is the first thing to check when a value is missing. The app can ignore it. |
 | `paused` | The game is on its pause screen. The mod keeps answering while paused. |
 | `transition` | Present while the player is leaving the floor: `"trapdoor"` or `"beam"`. The app shows the loading doodle until the next floor's data arrives. |
 

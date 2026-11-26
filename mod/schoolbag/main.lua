@@ -14,7 +14,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.1.0"
+local VERSION = "0.2.0"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -26,11 +26,25 @@ local game = Game()
 -- Helpers
 ------------------------------------------------------------------------------
 
+-- An error message without the folders in front of the file name.
+local function shortErr(e)
+  return (tostring(e):gsub("^.-([%w_%-]+%.lua:%d+:)", "%1"))
+end
+
+-- Game calls that didn't answer, for /watch. Often fine: not every call exists
+-- for every character or game version, which is why `try` is used. Kept to
+-- the first 30 different ones.
+local misses, missSeen = {}, {}
+
 -- Run fn and return its result, or nil if it errors (for API calls that may
 -- not exist in every game version).
 local function try(fn)
   local ok, v = pcall(fn)
   if ok then return v end
+  if not missSeen[v] then
+    missSeen[v] = true
+    if #misses < 30 then misses[#misses + 1] = shortErr(v) end
+  end
   return nil
 end
 
@@ -58,10 +72,17 @@ local function log(msg)
   Isaac.DebugString("[Schoolbag] " .. tostring(msg))
 end
 
-local logged = {}
-local function logOnce(msg) -- for things that could otherwise repeat every frame
-  if not logged[msg] then logged[msg] = true log(msg) end
+-- Parts of the mod that failed, for /watch as well as the game's log.txt
+-- (which is hard to reach on a handheld). Each one once; at most 30.
+local problems, problemSeen = {}, {}
+local function problem(msg)
+  msg = tostring(msg)
+  if problemSeen[msg] then return end
+  problemSeen[msg] = true
+  log(msg)
+  if #problems < 30 then problems[#problems + 1] = msg end
 end
+local logOnce = problem -- for things that could otherwise repeat every frame
 
 local K = {
   -- items and trinkets
@@ -915,14 +936,10 @@ end
 
 -- Build one part of the state. If it fails (say, a game update renamed
 -- something), that part is left out and the rest still goes to the app.
-local reported = {}
 local function section(name, fn)
   local ok, v = pcall(fn)
   if ok then return v end
-  if not reported[name] then
-    reported[name] = true
-    log(name .. " failed: " .. tostring(v))
-  end
+  problem(name .. " failed: " .. shortErr(v))
   return nil
 end
 
@@ -986,6 +1003,8 @@ local function buildState()
     paused = try(function() return game:IsPaused() end) == true,
     strings = stringCount, -- 0 means the app should send POST /strings
     hudHidden = SchoolbagHudHidden == true, -- the mod is hiding the game's HUD
+    problems = problems, -- parts of the mod that failed (for /watch and testing)
+    misses = misses,     -- game calls that didn't answer (often fine)
   }
   if not run.inRun then return s end
 
@@ -1087,11 +1106,16 @@ h1 { font-size: 18px; margin: 0 0 6px; }
 label { display: block; margin: 6px 0 10px; }
 pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
 summary { margin-top: 12px; cursor: pointer; }
+button { font: inherit; padding: 6px 14px; }
+p { margin: 6px 0 10px; }
 </style></head><body>
 <h1>Schoolbag watch</h1>
 <label><input type="checkbox" id="keep"> Keep the game's HUD (reads with ?hud=keep)</label>
+<p><button id="copy" type="button">Copy state</button> <span id="copied"></span></p>
 <pre id="sum">Waiting for the mod...</pre>
+<details><summary id="missHead">Game calls that didn't answer</summary><pre id="miss"></pre></details>
 <details><summary>Full state</summary><pre id="raw"></pre></details>
+<textarea id="clip" readonly style="position: absolute; left: -9999px; top: 0"></textarea>
 <script>
 var el = function (id) { return document.getElementById(id); };
 var BAG = ["", "red heart", "soul heart", "black heart", "eternal heart", "gold heart", "bone heart",
@@ -1109,13 +1133,14 @@ function hearts(h) {
 }
 function pct(v) { return v == null ? "?" : Math.round(v * 1000) / 10 + "%"; }
 function lines(s) {
-  var out = ["time " + new Date().toLocaleTimeString() + "   in run: " + s.inRun +
+  var out = ["mod " + (s.mod ? s.mod.version : "?") + "   time " + new Date().toLocaleTimeString() + "   in run: " + s.inRun +
     "   HUD hidden: " + s.hudHidden + "   words: " + s.strings +
     (s.humans > 1 ? "   CO-OP: " + s.humans + " people (the HUD stays on)" : "")];
   if (!s.inRun) return out;
-  var f = s.floor || {};
-  out.push("floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
-    (s.map && s.map.mirrored ? ", MIRROR WORLD" : "") + (s.transition ? ", leaving by " + s.transition : ""));
+  var f = s.floor;
+  out.push(f ? "floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
+    (s.map && s.map.mirrored ? ", MIRROR WORLD" : "") + (s.transition ? ", leaving by " + s.transition : "")
+    : "floor: not sent (see PROBLEMS)");
   var c = s.chances || {};
   out.push("chances: devil " + pct(c.devil) + ", planetarium " + pct(c.planetarium));
   (s.players || []).forEach(function (p) {
@@ -1152,11 +1177,48 @@ function lines(s) {
   if (s.death && s.death.gameOver) out.push("game over, killed by " + JSON.stringify(s.death.killer));
   return out;
 }
+function notes(s) {
+  var p = s.problems || [];
+  return p.length ? ["", "PROBLEMS (" + p.length + "):"].concat(p.map(function (x) { return "  " + x; }))
+    : ["", "problems: none"];
+}
+var last = null, lastAt = "";
+function report() {
+  if (!last) return "Schoolbag /watch: no answer from the mod yet.";
+  var m = last.misses || [];
+  return ["Schoolbag /watch report, " + lastAt, ""].concat(lines(last), notes(last),
+    ["", "Game calls that didn't answer (" + m.length + "):"], m.map(function (x) { return "  " + x; }),
+    ["", "Full state:", JSON.stringify(last)]).join("\n");
+}
+function copied(msg) {
+  el("copied").textContent = msg;
+  setTimeout(function () { el("copied").textContent = ""; }, 2500);
+}
+el("copy").onclick = function () {
+  var text = report();
+  var fallback = function () {
+    var t = el("clip");
+    t.value = text;
+    t.select();
+    try { copied(document.execCommand("copy") ? "Copied" : "Couldn't copy: select Full state instead"); }
+    catch (e) { copied("Couldn't copy: select Full state instead"); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { copied("Copied"); }, fallback);
+  } else {
+    fallback();
+  }
+};
 function tick() {
   fetch("/state" + (el("keep").checked ? "?hud=keep" : ""), { cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (s) {
-      el("sum").textContent = lines(s).join("\n");
+      last = s;
+      lastAt = new Date().toLocaleTimeString();
+      el("sum").textContent = lines(s).concat(notes(s)).join("\n");
+      var m = s.misses || [];
+      el("missHead").textContent = "Game calls that didn't answer: " + m.length + " (often fine)";
+      el("miss").textContent = m.join("\n");
       el("raw").textContent = JSON.stringify(s, null, 1);
     })
     .catch(function () {
@@ -1201,7 +1263,7 @@ local function handle(client)
     if ok then
       respond(client, "200 OK", "application/json", body)
     else
-      log("state failed: " .. tostring(body))
+      problem("state failed: " .. shortErr(body))
       respond(client, "500 Internal Server Error", "text/plain", tostring(body))
     end
   elseif path == "/health" then
@@ -1219,7 +1281,7 @@ local function serve()
     local client = server:accept()
     if not client then return end
     local ok, err = pcall(handle, client)
-    if not ok then log("request failed: " .. tostring(err)) end
+    if not ok then problem("request failed: " .. shortErr(err)) end
     pcall(function() client:close() end)
   end
 end
@@ -1589,10 +1651,10 @@ end
 local function drawStandIns()
   if banner then
     local ok, err = pcall(drawBanner)
-    if not ok then banner = nil logOnce("couldn't draw a banner: " .. tostring(err)) end
+    if not ok then banner = nil logOnce("couldn't draw a banner: " .. shortErr(err)) end
   end
   local ok, err = pcall(drawBossBar)
-  if not ok then boss.max = 0 logOnce("couldn't draw the boss bar: " .. tostring(err)) end
+  if not ok then boss.max = 0 logOnce("couldn't draw the boss bar: " .. shortErr(err)) end
 end
 
 ------------------------------------------------------------------------------
@@ -1672,9 +1734,9 @@ mod:AddCallback(ModCallbacks.MC_POST_UPDATE, function()
   if run.inRun then
     retryBind()
     local ok, err = pcall(watchPickups)
-    if not ok then logOnce("couldn't watch pickups: " .. tostring(err)) end
+    if not ok then logOnce("couldn't watch pickups: " .. shortErr(err)) end
     ok, err = pcall(watchBag)
-    if not ok then logOnce("couldn't watch the Bag of Crafting: " .. tostring(err)) end
+    if not ok then logOnce("couldn't watch the Bag of Crafting: " .. shortErr(err)) end
     if run.bagsDirty then saveRun() end -- the game could be closed before the next floor
     ok, err = pcall(scanBosses)
     if not ok then boss.max = 0 end
@@ -1717,7 +1779,7 @@ mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
     local ok, err = pcall(drawReminder)
     if not ok then
       remind.phase = nil
-      log("couldn't draw the reminder: " .. tostring(err))
+      problem("couldn't draw the reminder: " .. shortErr(err))
     end
   end
 end)

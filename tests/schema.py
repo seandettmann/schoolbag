@@ -16,6 +16,9 @@ def validate(s):
             errs.append(f"{where}.{key} is {type(obj[key]).__name__}")
 
     need(s, "protocol", int, "state")
+    for k in ("problems", "misses"):
+        if not _is_list(s.get(k)) or any(not isinstance(x, str) for x in s.get(k) or []):
+            errs.append(f"state.{k} must be a list of strings")
     if s.get("inRun"):
         need(s, "humans", int, "state")
     need(s, "inRun", bool, "state")

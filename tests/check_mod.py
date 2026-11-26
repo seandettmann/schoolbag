@@ -38,12 +38,13 @@ def get(path):
         return e.code, e.headers, e.read().decode()
 
 
-def state():
+def state(shape=True):
     status, headers, body = get("/state")
     assert status == 200, (status, body)
     s = json.loads(body)
-    errs = validate(s)
-    check(not errs, "state matches the protocol shape" + (f": {errs}" if errs else ""))
+    if shape:
+        errs = validate(s)
+        check(not errs, "state matches the protocol shape" + (f": {errs}" if errs else ""))
     return s, headers
 
 
@@ -183,6 +184,24 @@ try:
     status, headers, body = get("/watch")
     check(status == 200 and "text/html" in headers.get("Content-Type", "") and "fetch(\"/state\"" in body,
           "/watch is an HTML page that reads /state")
+    check("Copy state" in body and "navigator.clipboard" in body, "/watch has a Copy state button")
+    check('"mod " + (s.mod ? s.mod.version' in body, "/watch shows the mod's version")
+
+    print("problems and unanswered game calls, for testing on the device")
+    s, _ = state()
+    check(isinstance(s.get("problems"), list) and s["problems"] == [], f"no problems so far: {s.get('problems')}")
+    m = s.get("misses")
+    check(isinstance(m, list) and any("needs arguments" in x for x in m),
+          "a game call that didn't answer is listed (the floor name)")
+    check(all("/" not in x.split(": ")[0] for x in m), f"listed without the folders in front: {m[:2]}")
+    step("breakfloor")
+    s, _ = state(shape=False)  # the floor is meant to be missing here
+    check("floor" not in s and "map" in s and any(p.startswith("floor failed: stub_isaac.lua:") for p in s["problems"]),
+          f"a part that fails is left out, the rest still comes, and it's listed under problems: {s['problems']}")
+    step("breakfloor")
+    s, _ = state(shape=False)
+    check(len(s["problems"]) == 1, "each problem is listed once")
+    step("fixfloor")
 
     print("reading without hiding the HUD")
     status, _, body = get("/state?hud=keep")

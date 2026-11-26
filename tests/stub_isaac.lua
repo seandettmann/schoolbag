@@ -172,7 +172,7 @@ end
 
 local level = {
   GetCurses = function() return W.curses end,
-  GetStage = function() return W.stage end,
+  GetStage = function() if W.breakFloor then error("renamed in a game update") end return W.stage end,
   GetStageType = function() return W.stageType end,
   GetName = function() error("needs arguments in this version") end,
   GetRooms = function() return newRooms() end,

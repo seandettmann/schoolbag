@@ -83,6 +83,8 @@ function S.coop()
   W.extra = { p2 }
 end
 function S.solo() W.extra = {} W.twin0 = nil W.playerType = 0 end
+function S.breakfloor() W.breakFloor = true end
+function S.fixfloor() W.breakFloor = false end
 function S.mirror() W.mirror = true end
 function S.unmirror() W.mirror = false end
 
