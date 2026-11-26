@@ -29,6 +29,10 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   need the room; on the death page they stay clear of the ghost.
 - "My Stuff!" sits a little lower on the Items tab, clear of the paper's
   top edge, with the items under it.
+- The Items and Room tabs both show 7 items a row at full size. Past three
+  rows (21 items), swipe up or down on the page to scroll, or tap the arrows
+  at the grid's right. The Items tab shows the newest rows until you scroll,
+  and a Room with more than 7 pedestals now shows them all.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,

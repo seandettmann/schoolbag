@@ -386,6 +386,9 @@ final class HudView extends View implements Poller.Listener {
                 && live() && "none".equals(ui.settings) && ui.outdated == null) {
             ui.stepTab(dx < 0 ? 1 : -1); // a swipe left: the next tab
             acted = !ui.tab.equals(tabBefore);
+        } else if (Math.abs(dy) > SWIPE && Math.abs(dy) > 2 * Math.abs(dx) && held < SWIPE_TIME
+                && live() && "none".equals(ui.settings) && ui.outdated == null) {
+            acted = ui.scroll(dy < 0 ? 1 : -1); // a swipe up: the rows further down
         } else if (Math.hypot(dx, dy) < TAP_SLOP && held < TAP_TIME) {
             float hx = (downX - ox) / scale - shift[0], hy = (downY - oy) / scale - shift[1];
             acted = ui.tap(hx, hy);

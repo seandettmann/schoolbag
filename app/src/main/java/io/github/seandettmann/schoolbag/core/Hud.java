@@ -57,6 +57,7 @@ public final class Hud {
      */
     public static void draw(Painter p, Json.J state, Ui ui, Words words, long nowMs, boolean background) {
         ui.hits.clear();
+        ui.gridRows = 0;
         ui.wakeAt = Long.MAX_VALUE;
         Hud h = new Hud(p, ui, words, nowMs);
         h.background = background;
@@ -194,6 +195,37 @@ public final class Hud {
         text(Face.SMALL, 48, 54, fit(Face.SMALL, 48, quote, tw), tx, top + 70, GREY);
         if (open) text(Face.SMALL, 40, 46, fit(Face.SMALL, 40, back, tw), tx, top + 124, NUMGREY);
         if (!blind) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
+    }
+
+    // the Items and Room grids: 7 items a row at 3x from GRID_LEFT, three rows in
+    // view, and a column at their right for scrolling
+    static final int GRID_COLS = 7, GRID_ROWS = 3;
+    static final float GRID_LEFT = 40, GRID_STEP_X = 116, GRID_STEP_Y = 126;
+    static final float GRID_RIGHT = GRID_LEFT + (GRID_COLS - 1) * GRID_STEP_X + 96;
+
+    /**
+     * Scrolling for a grid with more than three rows, in a column at its right:
+     * the game's up arrow by the first row in view, its down arrow by the last,
+     * and a bar between them. An arrow moves the grid a row, and is faint when it
+     * can't go that way; a swipe up or down on the page does the same
+     * (Ui.scroll). `top` is the first row's top.
+     */
+    void gridScroll(int rows, int first, float top) {
+        ui.gridRows = rows;
+        ui.gridFirst = first;
+        if (rows <= GRID_ROWS) return;
+        float cx = GRID_RIGHT + 36, bottom = top + (GRID_ROWS - 1) * GRID_STEP_Y + 136; // the last row's numbers
+        boolean up = first > 0, down = first < rows - GRID_ROWS;
+        // the arrows' drawn part is 20 x 7 game pixels, 6 in and 5 down in their 32 x 16 frame
+        p.sprite("arrow_up", cx - 48, top - 15, 3, up ? 1f : 0.25f);
+        p.sprite("arrow_down", cx - 48, bottom - 36, 3, down ? 1f : 0.25f);
+        float barTop = top + 34, barH = bottom - 40 - barTop;
+        float thumbH = Math.round(barH * GRID_ROWS / rows);
+        float thumbY = barTop + (barH - thumbH) * first / (rows - GRID_ROWS);
+        p.rect(cx - 3, barTop, 6, barH, 0xFFB8A27F);
+        p.rect(cx - 3, thumbY, 6, thumbH, 0xFF6B5A47);
+        if (up) ui.hit(MX + GRID_RIGHT + 4, MY + top - 24, 76, 64, () -> ui.scroll(-1));
+        if (down) ui.hit(MX + GRID_RIGHT + 4, MY + bottom - 40, 76, 64, () -> ui.scroll(1));
     }
 
     /**

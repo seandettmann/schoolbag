@@ -42,7 +42,7 @@ final class TabRoom {
         List<Json.J> peds = room.get("pedestals").items();
         // a new room: select the first item
         int idx = room.get("index").integer(-1);
-        if (idx != ui.roomIndexSeen) { ui.roomIndexSeen = idx; ui.roomSel = 0; ui.roomDetail = false; }
+        if (idx != ui.roomIndexSeen) { ui.roomIndexSeen = idx; ui.roomSel = 0; ui.roomRow = 0; ui.roomDetail = false; }
         if (peds.isEmpty()) {
             p.sprite("doodle_006", 391, 140, 3, 1f);
             h.centered(Face.SMALL, Hud.BODY, Hud.BODY, "Nothing to pick up in here.", 96, 434, 768, Hud.INK);
@@ -63,14 +63,21 @@ final class TabRoom {
             int g = peds.get(i).get("group").integer();
             if (g > 0 && (group == 0 || g == group)) { group = g; if (g0 < 0) g0 = i; g1 = i; }
         }
-        if (group > 0 && g1 > g0) {
-            float lx = 84 + g0 * 120 - 22;
-            p.sprite("loop2", lx, 122, 3, 1f);
-            h.centered(Face.SMALL, 48, 48, "Take one", lx, 302, 261, Hud.INK);
+        // 7 across at 3x, three rows in view; past that the grid scrolls, as on the Items tab
+        int rows = (peds.size() + Hud.GRID_COLS - 1) / Hud.GRID_COLS;
+        int first = Math.min(ui.roomRow, Math.max(0, rows - Hud.GRID_ROWS));
+        int from = first * Hud.GRID_COLS, to = Math.min(peds.size(), (first + Hud.GRID_ROWS) * Hud.GRID_COLS);
+        int row0 = g0 / Hud.GRID_COLS;
+        if (group > 0 && g1 > g0 && g1 / Hud.GRID_COLS == row0 && g0 >= from && g1 < to) {
+            float lx = Hud.GRID_LEFT + (g0 % Hud.GRID_COLS) * Hud.GRID_STEP_X - 22, ly = 122 + (row0 - first) * Hud.GRID_STEP_Y;
+            p.sprite("loop2", lx, ly, 3, 1f);
+            // "Take one" under the loop, unless another row of items is there
+            if (rows == 1) h.centered(Face.SMALL, 48, 48, "Take one", lx, 302, 261, Hud.INK);
         }
-        for (int i = 0; i < peds.size() && i < 7; i++) {
+        for (int i = from; i < to; i++) {
             Json.J ped = peds.get(i);
-            float x = 84 + i * 120, y = 146;
+            int k = i - from;
+            float x = Hud.GRID_LEFT + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = 146 + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
             if (i == ui.roomSel) {
                 p.rect(x - 5, y - 5, 106, 4, Hud.INK);
                 p.rect(x - 5, y - 5 + 101, 106, 4, Hud.INK);
@@ -80,9 +87,10 @@ final class TabRoom {
             if (ped.get("blind").bool()) p.sprite("c_question", x, y, 3, 1f);
             else h.itemCell("items", ped.get("id").integer(), x, y, 3, 1f);
             h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
-            final int k = i;
-            ui.hit(Hud.MX + x - 12, Hud.MY + y - 5, 120, 127, () -> { ui.roomSel = k; ui.roomDetail = false; });
+            final int index = i;
+            ui.hit(Hud.MX + x - 10, Hud.MY + y - 5, Hud.GRID_STEP_X, 127, () -> { ui.roomSel = index; ui.roomDetail = false; });
         }
+        h.gridScroll(rows, first, 146);
         Json.J sel = peds.get(ui.roomSel);
         boolean blind = sel.get("blind").bool();
         h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, ui.roomDetail,

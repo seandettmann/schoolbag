@@ -83,6 +83,26 @@ public final class Ui {
     /** The mod's own timing, from its last report. */
     public String modPerf = "";
 
+    /** The first row of 7 in view on the Items tab (-1: the newest rows) and on the Room tab. */
+    public int itemsRow = -1, roomRow = 0;
+    // the grid on the tab last drawn: how many rows it has, and the first in view
+    int gridRows, gridFirst;
+
+    /**
+     * Moves the open tab's grid a row down (+1) or up (-1), as a swipe up or
+     * down or its arrows do. False if there's nothing to scroll that way.
+     */
+    public boolean scroll(int dir) {
+        if (gridRows <= Hud.GRID_ROWS) return false;
+        int first = Math.max(0, Math.min(gridRows - Hud.GRID_ROWS, gridFirst + dir));
+        if (first == gridFirst) return false;
+        if (tab.equals("items")) itemsRow = first;
+        else if (tab.equals("room")) roomRow = first;
+        else return false;
+        gridFirst = first;
+        return true;
+    }
+
     /** Switches to the next tab (+1) or the previous one (-1), as a swipe does. */
     public void stepTab(int dir) {
         String[] order = {"map", "items", "room"};
