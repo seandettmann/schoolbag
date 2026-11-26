@@ -206,7 +206,7 @@ The mod never sends what the game is hiding from the player:
 | `pauseMenu` | The game's pause menu is open: the pause button was pressed, and the game has been paused for about 3/4 of a second since. The app shows its Items tab then, if it follows the game. |
 | `input.mapAt` | When the Map button was last pressed, in the game's render frames (`Isaac.GetFrameCount()`, 60 a second, counting from the game's start). Only a change means anything: the app shows its Map tab. 0 until it's pressed. |
 | `perf` | For testing: how long the mod spent answering the app over the last 5 seconds (`seconds`): `answers` sent, the average and worst time building and encoding one (`avgMs`, `maxMs`), the worst time the server took in one frame (`frameMaxMs`), and the last `transport` used (`"udp"` or `"http"`). Missing for the first 5 seconds. Changes every 5 seconds, so leave it out when deciding whether anything changed. |
-| `transition` | Present while the player is leaving the floor: `"trapdoor"` or `"beam"`. The app shows the loading doodle until the next floor's data arrives. |
+| `transition` | Present while the player is leaving the floor: `"trapdoor"` or `"beam"`. The app keeps showing the map until the next floor's data arrives. |
 
 ## `run`
 

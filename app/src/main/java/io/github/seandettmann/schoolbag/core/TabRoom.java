@@ -6,13 +6,23 @@ import java.util.List;
 final class TabRoom {
     private TabRoom() {}
 
-    static void draw(Hud h, Json.J s) {
+    static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
         Ui ui = h.ui();
         Words w = h.words();
         Hud.page(p, "paper_blank", Hud.EXTRA, 0);
-        p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
         Json.J room = s.get("room");
+        if (TabMap.dead(s)) {
+            // the run is over: the death picture, and the item in front of you, if there was one
+            TabMap.ghost(h, player, TabMap.DOWN_SHORT);
+            List<Json.J> peds = room.get("pedestals").items();
+            if (!peds.isEmpty()) {
+                Json.J sel = peds.get(Math.min(ui.roomSel, peds.size() - 1));
+                h.itemCard(sel.get("id").integer(), sel.get("name").str(), sel.get("blind").bool(), false, "", () -> {});
+            }
+            return;
+        }
+        p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
         int type = room.get("type").integer();
         String typeName = name(type);
         if (typeName == null) {

@@ -83,7 +83,7 @@ public final class Hud {
         p.translate(MX, MY);
         switch (ui.tab) {
             case "map": TabMap.draw(this, s, player); break;
-            case "room": TabRoom.draw(this, s); break;
+            case "room": TabRoom.draw(this, s, player); break;
             default: TabItems.draw(this, s, player);
         }
         p.restore();

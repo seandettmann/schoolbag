@@ -19,6 +19,14 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   the right (with what's next in it, in grey).
 - On the Items and Room tabs, the card shows the item bigger, with just its
   name and pickup line. Tap it for the full description, as before.
+- Between floors the Map tab keeps showing the map, instead of a loading
+  picture.
+- When you die, the ghost shows on all three tabs, not just the Map.
+
+**Mod 0.3.1**
+- A banner line too long for the paper strip under it gets a longer strip,
+  so the words stay on the paper. Nearly half the cards need one (the tarot
+  cards' lines especially), and some items and trinkets.
 
 ## 0.2.0
 

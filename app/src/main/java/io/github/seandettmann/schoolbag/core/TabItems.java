@@ -40,12 +40,15 @@ final class TabItems {
             ui.itemCountSeen = cells.size();
         }
         int selIndex = ui.sel < 0 || ui.sel >= cells.size() ? cells.size() - 1 : ui.sel;
-        boolean detail = ui.detail && selIndex >= 0;
+        boolean dead = TabMap.dead(s);
+        boolean detail = ui.detail && selIndex >= 0 && !dead;
 
-        if (!detail) p.sprite("wm_hanger", 772, 20, 2, 0.14f);
+        if (!detail && !dead) p.sprite("wm_hanger", 772, 20, 2, 0.14f);
         p.sprite("wm_bible", 790, 660 + Hud.EXTRA * 3, 2, 0.14f);
 
-        if (detail) {
+        if (dead) {
+            TabMap.ghost(h, player, TabMap.DOWN_SHORT);
+        } else if (detail) {
             h.itemDetail(cells.get(selIndex).id);
         } else if (cells.size() <= 21) {
             // 7 across at 3x

@@ -49,8 +49,10 @@ final class TabMap {
     static final float MAP_CX = 475, MAP_CY = 268 + GROW * 1.5f, MAP_W = 780, MAP_H = 432 + GROW * 3;
     // the biggest zoom for the rooms (9 x 8 game pixels a cell): small floors fill the sheet
     static final int MAP_ZOOM = 14;
-    // how far the sheet's centre moved down since the first layout, for the loading and death pictures
+    // how far the sheet's centre moved down since the first layout, for the death picture
     static final float DOWN = (GROW - 22) * 1.5f;
+    // the same for the Items and Room tabs' shorter sheets
+    static final float DOWN_SHORT = DOWN - (GROW - Hud.EXTRA) * 1.5f;
 
     static void page(Painter p) {
         Hud.page(p, "paper_blank", GROW, GROW - Hud.EXTRA);
@@ -58,22 +60,12 @@ final class TabMap {
 
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
-        Words w = h.words();
         page(p);
         Json.J map = s.get("map");
-        boolean dead = s.get("death").get("gameOver").bool();
-        boolean loading = s.has("transition") && !dead;
         float[] box = null;
-        if (dead) {
-            dead(h, player);
-        } else if (loading) {
-            boolean a = (h.now() / 350) % 2 == 0;
-            h.ui().wake((h.now() / 350 + 1) * 350);
-            p.sprite(a ? "load_a" : "load_b", 368, 60 + DOWN, 2, 1f);
-            h.centered(Face.TITLE, Hud.NAME, Hud.NAME, "Loading...", 0, 356 + DOWN, 960, Hud.INK);
-            String leaving = s.get("run").get("difficulty").integer() >= 2
-                    ? Floors.greedName(w, s.get("floor")) : Floors.name(w, s.get("floor"), false);
-            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, "Leaving " + leaving, 0, 436 + DOWN, 960, Hud.GREY);
+        // between floors the map stays as it was until the next floor's arrives
+        if (dead(s)) {
+            ghost(h, player, DOWN);
         } else if (map.get("hidden").bool()) {
             p.sprite("map_question", 336, 36 + DOWN, 9, 1f);
             String why = map.get("hiddenReason").str().equals("lost")
@@ -165,16 +157,26 @@ final class TabMap {
         return s >= 1 && s <= 12 ? s : 1;
     }
 
-    private static void dead(Hud h, Json.J player) {
+    /** The run is over: the game's death screen is up. */
+    static boolean dead(Json.J s) {
+        return s.get("death").get("gameOver").bool();
+    }
+
+    /**
+     * The death picture, on every tab's sheet while the game's death screen is
+     * up: the ghost bobbing, and who died. `down` moves it to the middle of the
+     * tab's sheet (DOWN on the Map's, DOWN_SHORT on the others').
+     */
+    static void ghost(Hud h, Json.J player, float down) {
         Painter p = h.p();
         double t = (h.now() % 2400) / 2400.0;
         float bob = (float) (-12 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t)));
         boolean a = (h.now() / 350) % 2 == 0;
         h.ui().wake(h.now() + 66); // the ghost bobs
-        p.sprite(a ? "ghost_a" : "ghost_b", 391, 64 + DOWN + bob, 3, 1f);
+        p.sprite(a ? "ghost_a" : "ghost_b", 391, 64 + down + bob, 3, 1f);
         String who = h.words().text(player.get("name").str());
         if (who.isEmpty()) who = "Isaac";
-        h.centered(Face.TITLE, 64, 64, who + " died...", 0, 368 + DOWN, 960, Hud.INK);
+        h.centered(Face.TITLE, 64, 64, who + " died...", 0, 368 + down, 960, Hud.INK);
     }
 
     // The strip under the map, between its torn edges, and where its two halves meet.
