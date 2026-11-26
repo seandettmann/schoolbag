@@ -1,0 +1,9 @@
+# the game's art, fonts and words: never in this repo (built in from the private art repo)
+src/main/assets/art/
+# signing
+*.jks
+keystore.properties
+# build output
+build/
+.gradle/
+local.properties

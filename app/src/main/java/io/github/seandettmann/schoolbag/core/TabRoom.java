@@ -1,0 +1,112 @@
+package io.github.seandettmann.schoolbag.core;
+
+import java.util.List;
+
+/** The Room tab: the items on the pedestals in this room, numbered the same way everywhere. */
+final class TabRoom {
+    private TabRoom() {}
+
+    static void draw(Hud h, Json.J s) {
+        Painter p = h.p();
+        Ui ui = h.ui();
+        Words w = h.words();
+        p.sprite("paper_blank", 0, 0, 3, 1f);
+        p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
+        Json.J room = s.get("room");
+        int type = room.get("type").integer();
+        String typeName = name(type);
+        if (typeName == null) {
+            h.text(Face.TITLE, 64, 64, "In the Room", 84, 58, Hud.INK);
+        } else {
+            String icon = TabMap.icon(type);
+            float x = 84;
+            if (icon != null) {
+                p.sprite("i-" + icon, x - 18, 58 + (64 - 64) / 2f, 4, 1f);
+                x += 64 - 18 - 14 + 18;
+            }
+            h.text(Face.TITLE, 64, 64, typeName, x, 58, Hud.INK);
+        }
+        List<Json.J> peds = room.get("pedestals").items();
+        // a new room: select the first item
+        int idx = room.get("index").integer(-1);
+        if (idx != ui.roomIndexSeen) { ui.roomIndexSeen = idx; ui.roomSel = 0; }
+        if (peds.isEmpty()) {
+            p.sprite("doodle_006", 391, 140, 3, 1f);
+            h.centered(Face.SMALL, 50, 50, "Nothing to pick up in here.", 96, 438, 768, Hud.INK);
+            return;
+        }
+        p.sprite("doodle_033", 560, 300, 2, 0.13f);
+        p.sprite("wm_poop", 96, 380, 2, 0.14f);
+        if (ui.roomSel >= peds.size()) ui.roomSel = 0;
+        // items that share an options group: a pencil loop round them, "Take one" under it
+        int g0 = -1, g1 = -1, group = 0;
+        for (int i = 0; i < peds.size(); i++) {
+            int g = peds.get(i).get("group").integer();
+            if (g > 0 && (group == 0 || g == group)) { group = g; if (g0 < 0) g0 = i; g1 = i; }
+        }
+        if (group > 0 && g1 > g0) {
+            float lx = 84 + g0 * 120 - 22;
+            p.sprite("loop2", lx, 122, 3, 1f);
+            h.centered(Face.SMALL, 40, 40, "Take one", lx, 306, 261, Hud.INK);
+        }
+        for (int i = 0; i < peds.size() && i < 7; i++) {
+            Json.J ped = peds.get(i);
+            float x = 84 + i * 120, y = 146;
+            if (i == ui.roomSel) {
+                p.rect(x - 5, y - 5, 106, 4, Hud.INK);
+                p.rect(x - 5, y - 5 + 101, 106, 4, Hud.INK);
+                p.rect(x - 5, y - 5, 4, 105, Hud.INK);
+                p.rect(x - 5 + 102, y - 5, 4, 105, Hud.INK);
+            }
+            if (ped.get("blind").bool()) p.sprite("c_question", x, y, 3, 1f);
+            else h.itemCell("items", ped.get("id").integer(), x, y, 3, 1f);
+            h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
+            final int k = i;
+            ui.hit(Hud.MX + x - 5, Hud.MY + y - 5, 106, 127, () -> ui.roomSel = k);
+        }
+        Json.J sel = peds.get(ui.roomSel);
+        float cx = 72, cy = 580;
+        p.save();
+        p.clip(cx, cy, 790, 216);
+        if (sel.get("blind").bool()) {
+            p.sprite("c_question", cx, cy + 2, 3, 1f);
+            h.text(Face.TITLE, 64, 64, "???", cx + 120, cy + 2, Hud.INK);
+            h.text(Face.SMALL, 50, 50, "Curse of the Blind hides this one", cx + 120, cy + 70, Hud.GREY);
+        } else {
+            int id = sel.get("id").integer();
+            h.itemCell("items", id, cx, cy + 2, 3, 1f);
+            h.text(Face.TITLE, 64, 64, h.fit(Face.TITLE, 64, w.text(sel.get("name").str()), 670), cx + 120, cy + 2, Hud.INK);
+            h.text(Face.SMALL, 50, 50, h.fit(Face.SMALL, 50, w.quote("collectibles", id), 670), cx + 120, cy + 70, Hud.GREY);
+            h.text(Face.SMALL, 50, 50, h.fit(Face.SMALL, 50, w.firstLine(id), 790), cx, cy + 126, Hud.INK);
+        }
+        p.restore();
+    }
+
+    /** The room's name, where it has a type worth naming. */
+    static String name(int type) {
+        switch (type) {
+            case 2: return "Shop";
+            case 4: return "Treasure Room";
+            case 5: return "Boss Room";
+            case 7: return "Secret Room";
+            case 8: return "Super Secret Room";
+            case 9: return "Arcade";
+            case 10: return "Curse Room";
+            case 11: return "Challenge Room";
+            case 12: return "Library";
+            case 13: return "Sacrifice Room";
+            case 14: return "Devil Room";
+            case 15: return "Angel Room";
+            case 16: return "Crawl Space";
+            case 17: return "Boss Challenge";
+            case 18: return "Bedroom";
+            case 19: return "Bedroom";
+            case 20: return "Vault";
+            case 21: return "Dice Room";
+            case 22: return "Black Market";
+            case 24: return "Planetarium";
+            case 29: return "Ultra Secret Room";
+            default: return null;
+        }
+    }
+}

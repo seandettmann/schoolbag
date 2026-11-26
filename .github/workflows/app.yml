@@ -1,0 +1,106 @@
+# Builds the Schoolbag app and publishes it as a GitHub Release, which
+# Obtainium picks up. The game's art comes from the private schoolbag-art repo
+# (read with the ART_TOKEN secret), so it never lands in this public repo.
+name: App
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Art (private repo)
+        uses: actions/checkout@v4
+        with:
+          repository: seandettmann/schoolbag-art
+          token: ${{ secrets.ART_TOKEN }}
+          path: artrepo
+
+      - name: Put the art where the build reads it
+        run: |
+          mkdir -p app/src/main/assets
+          cp -r artrepo/art app/src/main/assets/art
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      # The release key lives in the private art repo, protected by the
+      # SIGNING_PASSWORD secret (a password only Sean has). The first build
+      # with that secret makes the key and saves it there (ART_TOKEN needs
+      # write access for that). Without the secret, each build gets a
+      # throwaway key: installable, but the next build can't update it.
+      - name: Signing key
+        id: sign
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          keystore_props() {
+            printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=schoolbag\nkeyPassword=%s\n' "$1" "$1" > app/keystore.properties
+          }
+          if [ -n "$SIGNING_PASSWORD" ] && [ -f artrepo/signing/release.jks ]; then
+            cp artrepo/signing/release.jks app/release.jks
+            keystore_props "$SIGNING_PASSWORD"
+            echo "kind=release" >> "$GITHUB_OUTPUT"
+          elif [ -n "$SIGNING_PASSWORD" ]; then
+            keytool -genkeypair -keystore app/release.jks -storetype PKCS12 -alias schoolbag -keyalg RSA \
+              -keysize 4096 -validity 36500 -storepass "$SIGNING_PASSWORD" -keypass "$SIGNING_PASSWORD" \
+              -dname "CN=Schoolbag, O=seandettmann"
+            keystore_props "$SIGNING_PASSWORD"
+            mkdir -p artrepo/signing
+            cp app/release.jks artrepo/signing/release.jks
+            cd artrepo
+            git config user.name "Schoolbag build"
+            git config user.email "seandettmann@users.noreply.github.com"
+            git add signing/release.jks
+            git commit -m "The app's release key (made by the build)"
+            if git push; then echo "kind=release" >> "$GITHUB_OUTPUT"; else
+              echo "::warning::Couldn't save the new key to schoolbag-art (ART_TOKEN needs write access). This build's key is throwaway."
+              echo "kind=throwaway" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            PW=$(openssl rand -base64 24)
+            keytool -genkeypair -keystore app/release.jks -storetype PKCS12 -alias schoolbag -keyalg RSA \
+              -keysize 2048 -validity 3650 -storepass "$PW" -keypass "$PW" -dname "CN=Schoolbag test"
+            keystore_props "$PW"
+            echo "::warning::No SIGNING_PASSWORD secret: this build is signed with a throwaway key."
+            echo "kind=throwaway" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: gradle -p app --no-daemon assembleRelease
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KIND: ${{ steps.sign.outputs.kind }}
+        run: |
+          VERSION=$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" app/build.gradle)
+          N=${{ github.run_number }}
+          APK=schoolbag-$VERSION-$N.apk
+          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          NOTES="Test build $N of the Schoolbag app $VERSION, from $(git rev-parse --short HEAD)."
+          if [ "$KIND" = "throwaway" ]; then
+            NOTES="$NOTES Signed with a throwaway key: uninstall the previous build before installing this one."
+          fi
+          gh release create "app-v$VERSION-$N" "$APK" --title "Schoolbag $VERSION (build $N)" --notes "$NOTES" --target "$GITHUB_SHA"
