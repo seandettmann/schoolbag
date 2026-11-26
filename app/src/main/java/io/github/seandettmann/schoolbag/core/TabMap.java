@@ -194,7 +194,10 @@ final class TabMap {
      * The strip under the map, where the game's HUD has these: the trinkets from
      * the left, the pocket mirrored from the right. One thing on a side shows at
      * 3x with its name beside it (towards the middle); two show side by side at
-     * 3x with no names. A pill's good, bad or horse is in grey under its name.
+     * 3x with no names; on the pocket's side the one you'll use next (the
+     * rightmost) has an ink box round it, like a selected item on the Items and
+     * Room tabs, and the other is faded. A pill's good, bad or horse is in grey
+     * under its name.
      * Tainted Cain's bag sits on the right, in two rows. No headings: the
      * pictures say which is which.
      */
@@ -233,7 +236,7 @@ final class TabMap {
             h.text(Face.SMALL, 44, 48, t, STRIP_X1 - p.width(Face.SMALL, 44, t), cy - 24, Hud.NUMGREY);
         } else if (pockets.size() == 1) {
             Json.J it = pockets.get(0);
-            pocket(h, it, STRIP_X1 - 48, cy);
+            pocket(h, it, STRIP_X1 - 48, cy, 1f);
             String name, note = "";
             int color = Hud.INK;
             if (it.get("kind").str().equals("pill")) {
@@ -253,8 +256,14 @@ final class TabMap {
             float tr = STRIP_X1 - 48 - 16;
             nameLines(h, name, note, color, tr, tr - (STRIP_HALF + 12), cy, true);
         } else {
-            pocket(h, pockets.get(0), STRIP_X1 - 48, cy);
-            pocket(h, pockets.get(1), STRIP_X1 - 48 - gap - 48, cy);
+            float ax = STRIP_X1 - 48;
+            pocket(h, pockets.get(0), ax, cy, 1f);
+            pocket(h, pockets.get(1), ax - gap - 48, cy, 0.45f);
+            float bx = ax - 10, by = cy - 46, bw = 68, bh = 92, b = 4; // round the 48 x 72 box
+            p.rect(bx, by, bw, b, Hud.INK);
+            p.rect(bx, by + bh - b, bw, b, Hud.INK);
+            p.rect(bx, by, b, bh, Hud.INK);
+            p.rect(bx + bw - b, by, b, bh, Hud.INK);
         }
     }
 
@@ -267,15 +276,15 @@ final class TabMap {
     }
 
     /** A pocket card or pill at 3x, in a card front's box (48 x 72) with its left at x, centred on cy. */
-    private static void pocket(Hud h, Json.J it, float x, float cy) {
+    private static void pocket(Hud h, Json.J it, float x, float cy, float alpha) {
         Painter p = h.p();
         float py = cy - 36;
         if (it.get("kind").str().equals("pill")) {
             String r = "pill-" + (it.get("color").integer() & 2047);
             int[] s = p.size(r);
-            if (s != null) p.sprite(r, x + (48 - s[0] * 3) / 2f, py + (72 - s[1] * 3) / 2f, 3, 1f);
+            if (s != null) p.sprite(r, x + (48 - s[0] * 3) / 2f, py + (72 - s[1] * 3) / 2f, 3, alpha);
         } else {
-            Cards.draw(p, it.get("id").integer(), x, py, 3);
+            Cards.draw(p, it.get("id").integer(), x, py, 3, alpha);
         }
     }
 

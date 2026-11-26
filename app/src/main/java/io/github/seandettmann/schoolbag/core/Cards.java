@@ -20,6 +20,11 @@ final class Cards {
      * and centred, at the largest whole zoom up to that one that fits.
      */
     static void draw(Painter p, int id, float x, float y, int zoom) {
+        draw(p, id, x, y, zoom, 1f);
+    }
+
+    /** The same, faded to `alpha`. */
+    static void draw(Painter p, int id, float x, float y, int zoom, float alpha) {
         String region = "card-" + id;
         int max = zoom;
         float boxW = 16 * zoom, boxH = 24 * zoom;
@@ -31,6 +36,6 @@ final class Cards {
         int z = max;
         while (z > 1 && (b[2] * z > boxW || b[3] * z > boxH)) z--;
         p.spritePart(region, b[0], b[1], b[2], b[3],
-                x + (float) Math.floor((boxW - b[2] * z) / 2), y + (float) Math.floor((boxH - b[3] * z) / 2), z, 1f);
+                x + (float) Math.floor((boxW - b[2] * z) / 2), y + (float) Math.floor((boxH - b[3] * z) / 2), z, alpha);
     }
 }

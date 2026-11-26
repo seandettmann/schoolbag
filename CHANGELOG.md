@@ -18,7 +18,8 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   the right, where the game's HUD has them, each in at most half the strip.
   One thing on a side shows at full size with its name beside it, towards
   the middle (a pill's good, bad or horse in grey under its name); two show
-  side by side at full size, without names.
+  side by side at full size, without names. With two pocket items, the one
+  you'll use next has an ink box round it and the other is faded.
 - On the Items and Room tabs, the card shows the item bigger, with just its
   name and pickup line. Tap it for the full description, as before.
 - Between floors the Map tab keeps showing the map, instead of a loading
