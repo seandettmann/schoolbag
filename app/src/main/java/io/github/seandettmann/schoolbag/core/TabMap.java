@@ -194,10 +194,11 @@ final class TabMap {
      * The strip under the map, where the game's HUD has these: the trinkets from
      * the left, the pocket mirrored from the right. One thing on a side shows at
      * 3x with its name beside it (towards the middle); two show side by side at
-     * 3x with no names; on the pocket's side the one you'll use next (the
-     * rightmost) has an ink box round it, like a selected item on the Items and
-     * Room tabs, and the other is faded. A pill's good, bad or horse is in grey
-     * under its name.
+     * 3x with no names; on the pocket's side the one you'll use next stays on
+     * the very right with a pencil line under it, and the next one is dimmed to
+     * its left. When they switch (the drop button) they slide past each other
+     * into their new places. A pill's good, bad or horse is in grey under its
+     * name.
      * Tainted Cain's bag sits on the right, in two rows. No headings: the
      * pictures say which is which.
      */
@@ -256,15 +257,66 @@ final class TabMap {
             float tr = STRIP_X1 - 48 - 16;
             nameLines(h, name, note, color, tr, tr - (STRIP_HALF + 12), cy, true);
         } else {
-            float ax = STRIP_X1 - 48;
-            pocket(h, pockets.get(0), ax, cy, 1f);
-            pocket(h, pockets.get(1), ax - gap - 48, cy, 0.45f);
-            float bx = ax - 10, by = cy - 46, bw = 68, bh = 92, b = 4; // round the 48 x 72 box
-            p.rect(bx, by, bw, b, Hud.INK);
-            p.rect(bx, by + bh - b, bw, b, Hud.INK);
-            p.rect(bx, by, b, bh, Hud.INK);
-            p.rect(bx + bw - b, by, b, bh, Hud.INK);
+            twoPockets(h, pockets, cy, gap);
         }
+    }
+
+    static final long SWAP_MS = 280;   // how long two pocket items take to switch places
+    static final float DIM = 0.45f;     // the next pocket item, waiting its turn
+
+    private static String pocketKey(Json.J it) {
+        return it.get("kind").str() + ":" + it.get("id").integer() + ":" + it.get("color").integer();
+    }
+
+    /**
+     * Every frame, on any tab: notices the pocket's first item becoming what was
+     * second (the drop button switching them, or the first used up), so the Map
+     * strip can show them switching places. Only starts it while the Map tab is
+     * open, so coming back to the tab later doesn't replay it.
+     */
+    static void trackPocket(Hud h, Json.J player) {
+        Ui ui = h.ui();
+        List<Json.J> pk = player.get("pockets").items();
+        String a = pk.size() > 0 ? pocketKey(pk.get(0)) : "", b = pk.size() > 1 ? pocketKey(pk.get(1)) : "";
+        if (!a.isEmpty() && !b.isEmpty() && a.equals(ui.pocket1) && !a.equals(ui.pocket0) && ui.tab.equals("map")) {
+            ui.swapFrom0 = ui.pocket0;
+            ui.swapFrom1 = ui.pocket1;
+            ui.pocketSwapAt = h.now();
+        }
+        ui.pocket0 = a;
+        ui.pocket1 = b;
+    }
+
+    /**
+     * Two pocket items: the one in use on the very right with a pencil line under
+     * it, the next dimmed to its left. Just after they switch, each slides from
+     * where it was to where it is now (passing the other a little above or
+     * below), brightening or dimming on the way; one that wasn't showing fades in.
+     */
+    private static void twoPockets(Hud h, List<Json.J> pockets, float cy, float gap) {
+        Painter p = h.p();
+        Ui ui = h.ui();
+        float right = STRIP_X1 - 48, left = right - gap - 48;
+        long since = h.now() - ui.pocketSwapAt;
+        float t = since >= 0 && since < SWAP_MS ? since / (float) SWAP_MS : 1f;
+        float e = 1 - (1 - t) * (1 - t) * (1 - t); // eases out
+        if (t < 1) ui.wake(h.now() + 16);
+        for (int i = 1; i >= 0; i--) { // the one in use drawn last, on top
+            Json.J it = pockets.get(i);
+            String k = pocketKey(it);
+            float toX = i == 0 ? right : left, toA = i == 0 ? 1f : DIM;
+            float fromX = k.equals(ui.swapFrom0) ? right : left;
+            float fromA = k.equals(ui.swapFrom0) ? 1f : k.equals(ui.swapFrom1) ? DIM : 0f;
+            if (t >= 1) { fromX = toX; fromA = toA; }
+            float x = fromX + (toX - fromX) * e, a = fromA + (toA - fromA) * e;
+            float arc = (float) Math.sin(Math.PI * e) * 14 * (toX > fromX ? -1 : 1); // moving right goes over
+            pocket(h, it, x, cy + arc, a);
+        }
+        // the pencil line under the one in use, like the open tab's: it stays put
+        float ly = cy + 36 + 10, lx = right - 2;
+        p.rect(lx, ly + 1, 18, 4, Hud.INK);
+        p.rect(lx + 18, ly, 20, 4, Hud.INK);
+        p.rect(lx + 38, ly + 2, 14, 4, Hud.INK);
     }
 
     /** A trinket at 3x (trimmed), its left at x (or its right, mirrored), centred on cy; returns its width. */

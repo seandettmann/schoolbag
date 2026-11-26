@@ -19,7 +19,9 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   One thing on a side shows at full size with its name beside it, towards
   the middle (a pill's good, bad or horse in grey under its name); two show
   side by side at full size, without names. With two pocket items, the one
-  you'll use next has an ink box round it and the other is faded.
+  you'll use next stays on the very right with a pencil line under it, and
+  the next one is dimmed to its left; when you switch them, they slide past
+  each other into their new places.
 - On the Items and Room tabs, the card shows the item bigger, with just its
   name and pickup line. Tap it for the full description, as before.
 - Between floors the Map tab keeps showing the map, instead of a loading

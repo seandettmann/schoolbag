@@ -76,6 +76,7 @@ public final class Hud {
         boolean live = s != null && s.get("inRun").bool() && ui.outdated == null && s.get("players").size() > 0;
         if (!live) { Pages.waiting(this); return; }
         Json.J player = s.get("players").at(0);
+        TabMap.trackPocket(this, player);
         header(s, player);
         pickups(player);
         stats(s, player);

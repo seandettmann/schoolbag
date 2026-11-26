@@ -83,6 +83,13 @@ public final class Ui {
     /** The mod's own timing, from its last report. */
     public String modPerf = "";
 
+    /**
+     * The first two pocket items as last drawn ("kind:id:color"), and when they
+     * last switched places (the drop button), for the Map strip's animation.
+     */
+    public String pocket0 = "", pocket1 = "", swapFrom0 = "", swapFrom1 = "";
+    public long pocketSwapAt = Long.MIN_VALUE;
+
     /** The first row of 7 in view on the Items tab (-1: the newest rows) and on the Room tab. */
     public int itemsRow = -1, roomRow = 0;
     // the grid on the tab last drawn: how many rows it has, and the first in view
