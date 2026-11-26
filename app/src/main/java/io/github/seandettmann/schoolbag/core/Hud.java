@@ -26,6 +26,8 @@ public final class Hud {
     // the torn edges
     static final float TAB_TEXT = 64, TAB_GAP = 6;
     static final int TAB_WIDEN = 6;
+    // the labels sit this much above the middle of their scraps, to leave room for the open tab's line
+    static final float TAB_LIFT = 8;
     // text sizes, a step up from the mock-ups after the first look on the Thor
     static final float LINE = 54;      // the header's line
     static final float NAME = 72;      // an item's name on its card
@@ -501,14 +503,25 @@ public final class Hud {
             if (size == null) continue;
             int keep = (Integer) tab[6] + TAB_WIDEN, from = (Integer) tab[7];
             float w = (keep + size[0] - from) * 2, h = (Float) tab[5], dy = (Float) tab[4];
+            // every scrap stays where it is; the open one is bright, with a pencil
+            // line under its label, and the others are dimmed
             boolean active = key.equals(ui.tab);
-            float y = TABS_Y + (active ? 0 : 16);
+            float y = TABS_Y;
             p.save();
             p.rotate((Float) tab[3], x + w / 2f, y + h / 2f);
             p.brightness(active ? STATIC : 0.55f);
             p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
             p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
-            centered(Face.SMALL, TAB_TEXT, TAB_TEXT, (String) tab[1], x, y + (h - TAB_TEXT) / 2f + dy, w, INK);
+            float ty = y + (h - TAB_TEXT) / 2f + dy - TAB_LIFT;
+            centered(Face.SMALL, TAB_TEXT, TAB_TEXT, (String) tab[1], x, ty, w, INK);
+            if (active) {
+                // a little uneven, like the game's doodles
+                float lw = p.width(Face.SMALL, TAB_TEXT, (String) tab[1]) + 12, lx = x + (w - lw) / 2f;
+                float ly = ty + TAB_TEXT * Face.SMALL.ascent + 1;
+                p.rect(lx, ly + 1, lw * 0.35f, 4, INK);
+                p.rect(lx + lw * 0.35f, ly, lw * 0.4f, 4, INK);
+                p.rect(lx + lw * 0.75f, ly + 2, lw * 0.25f, 4, INK);
+            }
             p.restore();
             // the tap area reaches down into the page a little: easier to hit with a thumb
             ui.hit(x, y, w, h + 36, () -> ui.tab = key);

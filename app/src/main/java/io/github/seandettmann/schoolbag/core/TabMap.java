@@ -179,19 +179,35 @@ final class TabMap {
 
     // The strip under the map, between its torn edges, and where its two halves meet.
     static final float STRIP_X0 = 66, STRIP_X1 = 855, STRIP_MID = (SHEET_BOTTOM + 826) / 2f;
-    static final float STRIP_SPLIT = STRIP_X0 + 0.55f * (STRIP_X1 - STRIP_X0);
+    static final float STRIP_SPLIT = STRIP_X0 + 0.45f * (STRIP_X1 - STRIP_X0);
 
     /**
-     * The strip under the map, as two small cards side by side. The pocket on
-     * the left: its picture, its name and, in grey under it, a pill's good, bad
-     * or horse and what's next in the pocket (or Tainted Cain's bag, in two rows).
-     * The trinkets on the right, a line each. No headings: the pictures say which
-     * is which.
+     * The strip under the map, as two small cards side by side, where the game's
+     * HUD has them. The trinkets on the left, a line each. The pocket on the
+     * right: its picture, its name and, in grey under it, a pill's good, bad or
+     * horse and what's next in the pocket (or Tainted Cain's bag, in two rows).
+     * No headings: the pictures say which is which.
      */
     private static void strip(Hud h, Json.J player) {
         Painter p = h.p();
         Words w = h.words();
-        float cy = STRIP_MID, x0 = STRIP_X0, right = STRIP_SPLIT - 16;
+        float cy = STRIP_MID, x0 = STRIP_SPLIT + 16, right = STRIP_X1;
+
+        // the trinkets, one a line
+        List<Json.J> trinkets = player.get("trinkets").items();
+        if (trinkets.isEmpty()) {
+            h.text(Face.SMALL, 44, 48, "No trinkets", STRIP_X0, cy - 24, Hud.NUMGREY);
+        } else {
+            int n = Math.min(trinkets.size(), 2);
+            float rowH = 68, y = cy - n * rowH / 2f;
+            for (int i = 0; i < n; i++) {
+                Json.J t = trinkets.get(i);
+                String name = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
+                p.picture("trinkets", t.get("id").integer(), STRIP_X0, y + 2, 2, 1f, false);
+                h.text(Face.SMALL, 40, 48, h.fit(Face.SMALL, 40, name, STRIP_SPLIT - 16 - STRIP_X0 - 72), STRIP_X0 + 72, y + 12, Hud.INK);
+                y += rowH;
+            }
+        }
 
         // the pocket (or Tainted Cain's bag)
         Json.J bag = player.get("bag");
@@ -235,23 +251,6 @@ final class TabMap {
             float tx = x0 + 48 + 20, tw = right - tx, th = note.isEmpty() ? 54 : 54 + 44;
             h.text(Face.TITLE, 48, 54, h.fit(Face.TITLE, 48, name, tw), tx, cy - th / 2f, color);
             if (!note.isEmpty()) h.text(Face.SMALL, 38, 44, h.fit(Face.SMALL, 38, note, tw), tx, cy - th / 2f + 54, Hud.GREY);
-        }
-
-        // the trinkets, one a line
-        float x = STRIP_SPLIT + 16;
-        List<Json.J> trinkets = player.get("trinkets").items();
-        if (trinkets.isEmpty()) {
-            h.text(Face.SMALL, 44, 48, "No trinkets", x, cy - 24, Hud.NUMGREY);
-            return;
-        }
-        int n = Math.min(trinkets.size(), 2);
-        float rowH = 68, y = cy - n * rowH / 2f;
-        for (int i = 0; i < n; i++) {
-            Json.J t = trinkets.get(i);
-            String name = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
-            p.picture("trinkets", t.get("id").integer(), x, y + 2, 2, 1f, false);
-            h.text(Face.SMALL, 40, 48, h.fit(Face.SMALL, 40, name, STRIP_X1 - x - 72), x + 72, y + 12, Hud.INK);
-            y += rowH;
         }
     }
 

@@ -12,9 +12,11 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   a size smaller and the scraps a little wider.
 - On a Curse of the Lost floor, "the map returns next floor" wraps onto two
   lines instead of running off the page.
-- The strip under the map is two small cards side by side: your pocket on
-  the left (with what's next in it, in grey) and your trinkets on the right,
-  one a line.
+- The tabs stay where they are when you switch: the open one is bright,
+  with a pencil line under its label, and the others are dimmed.
+- The strip under the map is two small cards side by side, where the game's
+  HUD has them: your trinkets on the left, one a line, and your pocket on
+  the right (with what's next in it, in grey).
 - On the Items and Room tabs, the card shows the item bigger, with just its
   name and pickup line. Tap it for the full description, as before.
 
