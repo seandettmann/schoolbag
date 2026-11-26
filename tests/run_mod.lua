@@ -61,6 +61,28 @@ function S.forgotten() -- The Forgotten in control; The Soul holds 2 and a half 
   PLAYER.GetSubPlayer = function() return soul end
 end
 function S.plain() W.playerType = 0 end
+function S.pills() W.identified = { [1] = true, [5] = true, [13] = true, [14] = true } end
+-- Jacob & Esau: one person, two characters on the same controller
+function S.jacobesau()
+  local jacob = Isaac.FirstPlayer()
+  W.playerType = 19
+  local esau = MakePlayer({ hash = "esau", ControllerIndex = 0 })
+  function esau:GetPlayerType() return 20 end
+  function esau:GetName() return "Esau" end
+  function esau:GetOtherTwin() return jacob end
+  function esau:GetMainTwin() return jacob end
+  W.twin0 = esau
+  W.extra = { esau }
+end
+-- local co-op: a second person on controller 1, who has died and is a ghost
+function S.coop()
+  W.playerType = 0
+  W.twin0 = nil
+  local p2 = MakePlayer({ hash = "p2", ControllerIndex = 1, Variant = 1 })
+  function p2:IsCoopGhost() return true end
+  W.extra = { p2 }
+end
+function S.solo() W.extra = {} W.twin0 = nil W.playerType = 0 end
 function S.mirror() W.mirror = true end
 function S.unmirror() W.mirror = false end
 

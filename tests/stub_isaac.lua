@@ -125,6 +125,7 @@ GameStateFlag = { STATE_BOSSRUSH_DONE = 3, STATE_BLUEWOMB_DONE = 4 }
 ----------------------------------------------------------------------------
 W = {
   frame = 0, time = 0, curses = 1, stage = 2, stageType = 0, paused = false,
+  identified = { [5] = true },
   roomType = 4, greed = false,
   items = { [45] = 1, [105] = 1 },
   effectsMantle = 0,
@@ -187,7 +188,7 @@ local room = {
 }
 
 local pool = {
-  IsPillIdentified = function(_, color) return color == 5 end,
+  IsPillIdentified = function(_, color) return W.identified[color] == true end,
   GetPillEffect = function(_, color) return color + 10 end,
 }
 
@@ -234,6 +235,19 @@ function player:IsItemQueueEmpty() return not W.queued end
 function player:GetSprite()
   return { IsPlaying = function(_, anim) return anim == W.playing end }
 end
+player.hash = "player0"
+player.Variant = 0
+function player:GetOtherTwin() return W.twin0 end
+function player:GetMainTwin() return self end
+function player:IsCoopGhost() return false end
+
+-- More players (co-op, Esau, Strawman's Keeper...): copies of the first player
+-- with some fields changed. W.extra holds them; Isaac.GetPlayer(1) is W.extra[1].
+function MakePlayer(over)
+  local p = setmetatable({}, { __index = player })
+  for k, v in pairs(over) do p[k] = v end
+  return p
+end
 
 local game = {
   Difficulty = 0, Challenge = 0,
@@ -243,7 +257,7 @@ setmetatable(game, { __index = function(_, k)
 end })
 function game:GetLevel() return level end
 function game:GetRoom() return room end
-function game:GetNumPlayers() return 1 end
+function game:GetNumPlayers() return 1 + #(W.extra or {}) end
 function game:IsPaused() return W.paused end
 function game:GetSeeds() return { GetStartSeedString = function() return W.seed end } end
 function game:GetVictoryLap() return 0 end
@@ -263,7 +277,8 @@ function GetPtrHash(e) return e.hash or e end
 Input = { IsActionTriggered = function(action) return action == ButtonAction.ACTION_DROP and W.dropPressed == true end }
 
 Isaac = {
-  GetPlayer = function(i) if i == 0 then return player end end,
+  GetPlayer = function(i) if i == 0 then return player end return (W.extra or {})[i] end,
+  FirstPlayer = function() return player end,
   GetItemConfig = function() return itemConfig end,
   FindByType = function(t, v)
     local out = {}

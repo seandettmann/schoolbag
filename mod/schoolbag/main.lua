@@ -744,6 +744,23 @@ local function pocketsInfo(p)
   return list
 end
 
+-- Every pill colour the run has identified, with what it does for this player
+-- (PHD and False PHD change some effects). Only identified colours are sent, so
+-- nothing is spoiled. Gold pills do something different every time, so they're
+-- left out.
+local function pillsInfo(p)
+  local list = {}
+  local pool = game:GetItemPool()
+  for color = 1, PILL_GOLD - 1 do
+    if try(function() return pool:IsPillIdentified(color) end) == true then
+      local entry = { color = color, effect = try(function() return pool:GetPillEffect(color, p) end) }
+      if entry.effect then entry.name = configName("pill", entry.effect) end
+      list[#list + 1] = entry
+    end
+  end
+  return list
+end
+
 local function itemsInfo(i)
   local list = {}
   for _, id in ipairs(playerBook(i).order) do
@@ -792,6 +809,45 @@ local function otherFormInfo(p)
   return { type = try(function() return sub:GetPlayerType() end), health = healthInfo(sub) }
 end
 
+-- How many people are playing: one per controller. Esau, Tainted Forgotten's
+-- Soul, Strawman's Keeper and Found Soul move with their player's controller,
+-- so they don't count as another person.
+local function humanCount()
+  local seen, n = {}, 0
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    local c = p and try(function() return p.ControllerIndex end)
+    if c ~= nil and not seen[c] then
+      seen[c] = true
+      n = n + 1
+    end
+  end
+  return math.max(n, 1)
+end
+
+-- Players by entity, so a twin can point at the other's place in `players`.
+local playerSlots = {}
+
+local function refreshPlayerSlots()
+  playerSlots = {}
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    if p then playerSlots[GetPtrHash(p)] = i end
+  end
+end
+
+-- Pairs that play as one: Jacob and Esau, Tainted Forgotten and his Soul,
+-- Tainted Lazarus and his other form (with Birthright). `main` is false for the
+-- second of the pair (Esau...).
+local function twinInfo(p)
+  local other = try(function() return p:GetOtherTwin() end)
+  if not other then return nil end
+  local j = playerSlots[GetPtrHash(other)]
+  if j == nil then return nil end
+  local main = try(function() return p:GetMainTwin() end)
+  return { index = j, main = main == nil or GetPtrHash(main) == GetPtrHash(p) }
+end
+
 local function playerInfo(i, p, curses)
   local healthHidden = curses & K.CURSE_UNKNOWN ~= 0
   local t = {
@@ -812,13 +868,21 @@ local function playerInfo(i, p, curses)
       bloodCharge = try(function() return p:GetBloodCharge() end),
     },
     stats = statsInfo(p),
+    controller = try(function() return p.ControllerIndex end),
+    twin = try(function() return twinInfo(p) end),
     actives = activesInfo(p),
     trinkets = trinketsInfo(p),
     pockets = pocketsInfo(p),
+    pills = pillsInfo(p),
     items = itemsInfo(i),
     forms = formsInfo(p),
     bag = try(function() return bagInfo(i, p) end),
   }
+  -- co-op: a dead player's ghost, a co-op baby, and helpers such as Strawman's
+  -- Keeper (a player with a parent)
+  if try(function() return p:IsCoopGhost() end) == true then t.ghost = true end
+  if try(function() return p.Variant end) == 1 then t.baby = true end
+  if try(function() return p.Parent end) ~= nil then t.child = true end
   t.poops = try(function() return poopsInfo(p) end)
   if healthHidden then
     t.health = { hidden = true }
@@ -932,6 +996,8 @@ local function buildState()
   s.map = section("map", function() return mapInfo(level, curses) end)
   s.room = section("room", function() return roomInfo(level, curses) end)
   s.players = {}
+  s.humans = try(humanCount) or 1
+  try(refreshPlayerSlots)
   for i = 0, game:GetNumPlayers() - 1 do
     local p = Isaac.GetPlayer(i)
     local info = p and section("player", function() return playerInfo(i, p, curses) end)
@@ -1041,18 +1107,24 @@ function hearts(h) {
     "), bone " + h.boneHearts + ", gold " + h.goldenHearts + ", eternal " + h.eternalHearts +
     ", rotten " + h.rottenHearts + ", broken " + h.brokenHearts;
 }
+function pct(v) { return v == null ? "?" : Math.round(v * 1000) / 10 + "%"; }
 function lines(s) {
   var out = ["time " + new Date().toLocaleTimeString() + "   in run: " + s.inRun +
-    "   HUD hidden: " + s.hudHidden + "   words: " + s.strings];
+    "   HUD hidden: " + s.hudHidden + "   words: " + s.strings +
+    (s.humans > 1 ? "   CO-OP: " + s.humans + " people (the HUD stays on)" : "")];
   if (!s.inRun) return out;
   var f = s.floor || {};
   out.push("floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
     (s.map && s.map.mirrored ? ", MIRROR WORLD" : "") + (s.transition ? ", leaving by " + s.transition : ""));
+  var c = s.chances || {};
+  out.push("chances: devil " + pct(c.devil) + ", planetarium " + pct(c.planetarium));
   (s.players || []).forEach(function (p) {
     var k = p.pickups || {};
     out.push("");
     out.push("player " + p.index + ": type " + p.type + " " + (p.name || "") + ", lives " + p.lives +
-      (p.livesMaybe ? "?" : ""));
+      (p.livesMaybe ? "?" : "") + ", controller " + p.controller +
+      (p.twin ? (p.twin.main ? ", twin: player " : ", second twin of player ") + p.twin.index : "") +
+      (p.ghost ? ", GHOST" : "") + (p.baby ? ", baby" : "") + (p.child ? ", helper (has a parent)" : ""));
     out.push("  hearts: " + hearts(p.health));
     if (p.shields && p.shields.length) out.push("  shields: " + p.shields.join(", "));
     out.push("  coins " + k.coins + ", bombs " + k.bombs + ", keys " + k.keys +
@@ -1068,6 +1140,9 @@ function lines(s) {
     out.push("  actives: " + (p.actives || []).map(function (a) { return a.slot + ":" + a.id; }).join(" ") +
       "   items: " + (p.items || []).length + ", last " +
       (p.items || []).slice(-3).map(function (i) { return i.id; }).join(" "));
+    out.push("  pills known: " + ((p.pills || []).map(function (x) {
+      return x.color + "=" + String(x.name || x.effect).replace(/^#/, "").replace(/_NAME$/, "");
+    }).join(", ") || "none yet"));
   });
   var r = s.room || {};
   out.push("");
@@ -1197,8 +1272,14 @@ local function craftingPreviewShowing()
   return false
 end
 
+-- In co-op (two or more people) the game's HUD stays on: the others only see
+-- the main screen. Jacob & Esau is one person, so it still hides.
+local function coopRun()
+  return (try(humanCount) or 1) > 1
+end
+
 local function updateGameHud()
-  if run.inRun and appWatching() and not try(craftingPreviewShowing) then
+  if run.inRun and appWatching() and not try(craftingPreviewShowing) and not coopRun() then
     setGameHud(false)
   elseif SchoolbagHudHidden then
     setGameHud(true)

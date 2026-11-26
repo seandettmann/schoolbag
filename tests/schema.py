@@ -16,6 +16,8 @@ def validate(s):
             errs.append(f"{where}.{key} is {type(obj[key]).__name__}")
 
     need(s, "protocol", int, "state")
+    if s.get("inRun"):
+        need(s, "humans", int, "state")
     need(s, "inRun", bool, "state")
     need(s, "paused", bool, "state")
     need(s, "strings", int, "state")  # how many of the game's words the app has sent
@@ -65,6 +67,19 @@ def validate(s):
         for k in ("shields", "actives", "trinkets", "pockets", "items", "forms"):
             if not _is_list(p.get(k)):
                 errs.append(f"player.{k} not a list")
+        if "twin" in p:
+            tw = p["twin"]
+            if not isinstance(tw, dict) or not isinstance(tw.get("index"), int) or not isinstance(tw.get("main"), bool):
+                errs.append(f"player.twin must be {{index, main}}: {tw}")
+        for flag in ("ghost", "baby", "child"):
+            if flag in p and p[flag] is not True:
+                errs.append(f"player.{flag} is only sent as true")
+        if not _is_list(p.get("pills")):
+            errs.append("player.pills not a list")
+        for pl in p.get("pills") or []:
+            if not isinstance(pl.get("color"), int) or not 1 <= pl["color"] <= 13:
+                errs.append(f"pills: colour must be 1-13 (gold pills aren't listed): {pl}")
+            need(pl, "effect", int, "pills")
         for pk in p.get("pockets") or []:
             if pk.get("kind") == "pill" and not pk.get("identified") and "effect" in pk:
                 errs.append("unidentified pill leaks its effect")

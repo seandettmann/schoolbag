@@ -78,8 +78,10 @@ def base_player():
             {"slot": 1, "id": 19, "golden": False, "name": TRINKETS[19]},
         ],
         "pockets": [{"slot": 0, "kind": "card", "id": 1, "name": "#THE_FOOL_NAME"}],
+        "pills": [{"color": 5, "effect": 5, "name": "#FULL_HEALTH_NAME"}],
         "items": [item(i) for i in RUN_ITEMS],
         "forms": [0] * 16,
+        "controller": 0,
     }
 
 
@@ -89,6 +91,7 @@ def base_state():
         "mod": {"name": "Schoolbag", "version": "mock"},
         "inRun": True,
         "paused": False,
+        "humans": 1,
         "run": {"seed": "ABCD EFGH", "difficulty": 0, "challenge": 0, "victoryLap": 0,
                 "timeFrames": 37260, "bossRushDone": False, "blueWombDone": False},
         "floor": {"stage": 2, "stageType": 0, "altPath": False, "name": "Basement II",
@@ -176,8 +179,16 @@ def scenario(name):
     elif name == "pills":
         p["pockets"] = [
             {"slot": 0, "kind": "pill", "color": 3, "horse": False, "identified": False},
-            {"slot": 1, "kind": "pill", "color": 5, "horse": True, "identified": True, "effect": 7,
+            {"slot": 1, "kind": "pill", "color": 5, "horse": True, "identified": True, "effect": 5,
              "name": "#FULL_HEALTH_NAME"},
+        ]
+        # the pill tracker: five colours identified so far this run
+        p["pills"] = [
+            {"color": 1, "effect": 1, "name": "#BAD_TRIP_NAME"},
+            {"color": 4, "effect": 14, "name": "#SPEED_UP_NAME"},
+            {"color": 5, "effect": 5, "name": "#FULL_HEALTH_NAME"},
+            {"color": 9, "effect": 8, "name": "#I_FOUND_PILLS_NAME"},
+            {"color": 12, "effect": 9, "name": "#PUBERTY_NAME"},
         ]
     elif name == "tcain":
         # Tainted Cain: the Bag of Crafting in the pocket and what the mod saw go in
@@ -204,6 +215,33 @@ def scenario(name):
             "hidden": False, "maxHearts": 0, "hearts": 0, "soulHearts": 5, "blackMask": 0,
             "boneHearts": 0, "boneMask": 0, "goldenHearts": 0, "eternalHearts": 0,
             "rottenHearts": 0, "brokenHearts": 0, "heartLimit": 12}}
+    elif name == "jacobesau":
+        # Jacob & Esau: one person, two characters; Esau is the second twin
+        p["type"], p["name"] = 19, "Jacob"
+        p["health"].update({"maxHearts": 6, "hearts": 6, "soulHearts": 0, "blackMask": 0})
+        p["stats"].update({"tears": 2.73, "damage": 2.75, "range": 6.5})
+        p["actives"] = p["actives"][:1]
+        p["trinkets"] = p["trinkets"][:1]
+        p["items"] = p["items"][:5]
+        p["twin"] = {"index": 1, "main": True}
+        e = base_player()
+        e.update({"index": 1, "type": 20, "name": "Esau", "twin": {"index": 0, "main": False}})
+        e["health"].update({"maxHearts": 2, "hearts": 2, "soulHearts": 2, "blackMask": 0})
+        e["stats"].update({"tears": 2.5, "damage": 3.75, "range": 5.0, "luck": 1.0})
+        e["actives"] = [{"slot": 0, "id": 45, "name": NAMES[45], "charge": 2, "maxCharge": 4,
+                         "chargeType": 0, "battery": 0}]
+        e["trinkets"] = [{"slot": 0, "id": 19, "golden": False, "name": TRINKETS[19]}]
+        e["pockets"] = [{"slot": 0, "kind": "pill", "color": 3, "horse": False, "identified": False}]
+        e["items"] = p["items"][2:4]
+        s["players"].append(e)
+    elif name == "coop":
+        # local co-op: a second person on controller 1, now a ghost; the mod leaves the HUD on
+        s["humans"] = 2
+        g = base_player()
+        g.update({"index": 1, "type": 2, "name": "Cain", "controller": 1, "ghost": True, "baby": True,
+                  "items": [], "actives": [], "trinkets": [], "pockets": []})
+        g["health"].update({"maxHearts": 0, "hearts": 0, "soulHearts": 0, "blackMask": 0})
+        s["players"].append(g)
     else:
         raise KeyError(name)
     return s
@@ -212,7 +250,7 @@ def scenario(name):
 SCENARIOS = ["normal", "notinrun", "offline", "paused", "lost", "unknown", "blind", "loading",
              "dead", "active0", "active1", "greed", "challenge", "shields", "shieldsall",
              "bossrush", "hush", "devil", "emptyroom", "newitem", "pills", "tcain",
-             "tbluebaby", "forgotten", "mirror"]
+             "tbluebaby", "forgotten", "mirror", "jacobesau", "coop"]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -257,7 +295,8 @@ class Handler(BaseHTTPRequestHandler):
         state = scenario(Handler.current)
         state["strings"] = len(Handler.strings)
         # like the mod: reading hides the game's HUD unless the app asks ?hud=keep
-        state["hudHidden"] = bool(state.get("inRun")) and "hud=keep" not in self.path
+        state["hudHidden"] = (bool(state.get("inRun")) and "hud=keep" not in self.path
+                              and state.get("humans", 1) <= 1)  # co-op leaves the game's HUD on
         if state.get("inRun") and state.get("run") and not state.get("paused"):
             # the run clock keeps ticking (30 frames per second)
             state["run"]["timeFrames"] += int((time.time() - Handler.started) * 30)

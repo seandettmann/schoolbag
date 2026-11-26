@@ -27,8 +27,10 @@ also hides the game's floor, item, pill and card banners and the boss health
 bar, so the mod draws those itself, with the game's own art and the game's
 words sent over by the app.
 
-One exception: on **Tainted Cain** runs, the game's HUD comes back while his
-Bag of Crafting is full. The game only shows what the bag will make inside its
+Two exceptions. In **co-op** (two or more people, one per controller), the
+game's HUD stays on, since the other players only see the main screen. Jacob &
+Esau is one person, so it still hides. And on **Tainted Cain** runs, the game's
+HUD comes back while his Bag of Crafting is full. The game only shows what the bag will make inside its
 own HUD, and mods can't read it, so this keeps the crafting preview on screen.
 It hides again once he crafts. (The game only lets mods show or hide the whole
 HUD, not parts of it.) On the bottom screen, Schoolbag shows what's in the bag.
@@ -43,11 +45,23 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Roadmap
 
-Next:
+**Next**
 - The app, built from the finished mock-ups.
 - A first test of the mod in the real game on the Thor.
 
-To revisit later:
+**Parked** (set aside for now, with the work kept)
+- **Pill tracker.** A "Pills" tag on the Items tab opening a page of the 13
+  pill colours, each named once the run has identified it (never before, so
+  nothing is spoiled). Progress: designed; the mod already sends the data
+  (`players[].pills`, tested against the stand-in); not in the app's first
+  version. Needs more thought before it's built.
+- **Co-op on the bottom screen.** Progress: the mod sends every player and
+  leaves the game's own HUD on in co-op, since the other players only see the
+  main screen. How the app shows several people at once isn't designed yet.
+  Local co-op on a handheld is unusual. (Jacob & Esau is designed: it follows
+  the game's own layout.)
+
+**To revisit**
 - **Tainted Cain's crafting preview.** For now the game's whole HUD returns on
   Tainted Cain runs while the Bag of Crafting is full (see above), with no
   setting. Revisit if the game's mod API ever lets mods read the bag's result,
@@ -89,7 +103,8 @@ Eden Duo emulator's dual-screen
 ## Made with AI
 
 Most of Schoolbag's code, docs and design were written with Claude, Anthropic's
-AI model. No AI image generator was used; the art is the game's own.
+AI model. No AI image generator was used: the app's art is the game's own, and
+the Workshop image and the app icon are doodles drawn in code.
 
 ## For developers
 
@@ -98,6 +113,8 @@ docs/protocol.md        what the mod sends (protocol 1)
 mod/schoolbag/          the Workshop mod: main.lua + metadata.xml, and resources/ with
                         the boss bar's animation file (it points at the game's own image)
 tools/make_bossbar_anm2.py  writes that animation file
+tools/draw_preview.py   draws the Workshop image, mod/preview.png
+tools/draw_icon.py      draws the app icon's layers into app/icon/
 tools/mock_server.py    a fake mod with scenarios, for building the app without the game
 tests/                  runs the real mod against a stubbed game API, and checks the fake
 ```
@@ -132,7 +149,7 @@ that folder's `metadata.xml`. It goes up as **private** (`metadata.xml` says
 so), which is enough to subscribe on your own account and let GameNative
 install it on the Thor. For updates, run the uploader again on the same folder.
 Switch the item to public on its Workshop page at release. `mod/preview.png`
-is a placeholder thumbnail (no game art) if the uploader asks for one.
+is the Workshop image (our own art, no game art) if the uploader asks for one.
 
 ## License
 

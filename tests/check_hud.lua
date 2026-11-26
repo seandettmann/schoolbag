@@ -121,6 +121,27 @@ check(visible(), "shown while the mod isn't sure what's in the bag")
 W.actives[0], W.actives[2], W.playerType = 105, nil, 0
 reading()
 check(not visible(), "hidden again without the bag")
+
+print("co-op and Jacob & Esau")
+local jacob = Isaac.GetPlayer(0)
+local esau = MakePlayer({ hash = "esau", ControllerIndex = 0 })
+function esau:GetPlayerType() return 20 end
+function esau:GetOtherTwin() return jacob end
+function esau:GetMainTwin() return jacob end
+W.extra = { esau }
+reading()
+check(not visible(), "Jacob & Esau (one person, one controller): still hidden")
+W.extra = { MakePlayer({ hash = "p2", ControllerIndex = 1 }) }
+reading()
+check(visible(), "co-op, a second person on controller 1: the game's HUD stays on")
+local body = poll():match("\r\n\r\n(.*)$") or ""
+check(body:find('"humans":2') ~= nil and body:find('"hudHidden":false') ~= nil, "state says 2 people and the HUD isn't hidden")
+W.extra = { MakePlayer({ hash = "keeper", ControllerIndex = 0, Parent = jacob }) }
+reading()
+check(not visible(), "Strawman's Keeper on the same controller: not another person, still hidden")
+W.extra = {}
+reading()
+check(not visible(), "back to one player: hidden")
 SchoolbagServer:close()
 SchoolbagServer = nil
 -- a mod reload (luamod) while hidden: the new copy still knows to give it back

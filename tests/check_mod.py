@@ -80,6 +80,8 @@ try:
     known = [x for x in p["pockets"] if x["kind"] == "pill" and x["slot"] == 2][0]
     check(known["identified"] is True and known["effect"] == 15, "identified pill sends its effect")
     check(p["pockets"][0] == {"slot": 0, "kind": "card", "id": 1, "name": "#THE_FOOL_NAME"}, "card")
+    check(p["pills"] == [{"color": 5, "effect": 15, "name": "#PILL_15"}],
+          f"only identified pill colours are listed, with effect and name: {p['pills']}")
     check(len(p["forms"]) == 16 and p["forms"][1] == 2, "transformation progress (enum missing, fallback used)")
     peds = s["room"]["pedestals"]
     check([x["id"] for x in peds] == [4, 118] and all("price" not in x for x in peds),
@@ -143,6 +145,32 @@ try:
     check("otherForm" not in s["players"][0], "Curse of the Unknown hides the other form's hearts too")
     step("uncursed")
     step("plain")
+
+    print("one person, co-op and twins")
+    check(s["humans"] == 1 and s["players"][0].get("controller") == 0, "solo: 1 person, controller sent")
+    check("twin" not in s["players"][0] and "ghost" not in s["players"][0], "solo: no twin, not a ghost")
+    step("jacobesau")
+    s, _ = state()
+    j, e = s["players"][0], s["players"][1]
+    check(len(s["players"]) == 2 and s["humans"] == 1, f"Jacob & Esau: two players, one person: {s['humans']}")
+    check(j["twin"] == {"index": 1, "main": True} and e["twin"] == {"index": 0, "main": False},
+          f"twins point at each other, Jacob first: {j.get('twin')} {e.get('twin')}")
+    check(e["type"] == 20 and e["name"] == "Esau", "Esau has his own type and name")
+    check(s["hudHidden"] is True, "Jacob & Esau: the HUD is still hidden")
+    step("coop")
+    s, _ = state()
+    p2 = s["players"][1]
+    check(s["humans"] == 2 and p2["controller"] == 1, f"co-op: 2 people: {s['humans']}")
+    check(p2.get("ghost") is True and p2.get("baby") is True, "a dead co-op player is sent as a ghost")
+    check(s["hudHidden"] is False, "co-op: the mod leaves the game's HUD on")
+    step("solo")
+
+    print("pill tracker")
+    step("pills")
+    s, _ = state()
+    got = s["players"][0]["pills"]
+    check([x["color"] for x in got] == [1, 5, 13], f"identified colours in colour order, gold pill left out: {got}")
+    check(all(x["effect"] == x["color"] + 10 for x in got), "each colour's effect for this player")
 
     print("mirror world")
     check(s["map"].get("mirrored") is False, "map.mirrored is false outside the mirror world")

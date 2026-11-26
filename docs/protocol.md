@@ -40,6 +40,13 @@ player without a HUD. Reading while paused keeps it
 hidden. Reading with `?hud=keep` never hides it, and gives it back at once if
 it was hidden.
 
+**Co-op:** with two or more people playing (counted by controller: Esau,
+Tainted Forgotten's Soul, Strawman's Keeper and Found Soul move with their
+player's controller, so they don't count), the mod leaves the game's HUD on,
+since the other players only see the main screen. `humans` says how many
+people there are and `hudHidden` stays false. Jacob & Esau is one person, so
+the HUD still hides.
+
 **Tainted Cain:** on a Tainted Cain run, the HUD stays showing while his Bag
 of Crafting is full, or while the mod isn't sure what's in it (`bag.sure` is
 false). The game only shows what the bag will make inside its own HUD, mods
@@ -110,7 +117,8 @@ The mod never sends what the game is hiding from the player:
 
 - **Curse of the Blind**, and any pedestal the game reports as blind: the
   pedestal is sent with `"blind": true` and no `id` or `name`.
-- **Unidentified pills:** `identified: false` and no `effect`.
+- **Unidentified pills:** `identified: false` and no `effect`, and the colour
+  isn't in `pills` until the game has identified it.
 - **Curse of the Unknown:** `health` is `{"hidden": true}` and `shields` is
   empty.
 - **Map:** only rooms the game itself shows on the minimap are sent (rooms with
@@ -125,6 +133,7 @@ The mod never sends what the game is hiding from the player:
   "mod": { "name": "Schoolbag", "version": "0.1.0" },
   "inRun": true,
   "paused": false,
+  "humans": 1,
   "strings": 2104,
   "run": { ... },
   "floor": { ... },
@@ -140,6 +149,7 @@ The mod never sends what the game is hiding from the player:
 | Field | Meaning |
 |---|---|
 | `inRun` | `true` while a run is going. |
+| `humans` | How many people are playing (one per controller). More than 1 is co-op, and the mod leaves the game's HUD on. |
 | `strings` | How many of the game's words the app has sent with `POST /strings`. 0 means send them. |
 | `hudHidden` | `true` while the mod is hiding the game's HUD. |
 | `paused` | The game is on its pause screen. The mod keeps answering while paused. |
@@ -211,7 +221,9 @@ the items the same way in every room, shops and devil deals included.
 
 ## `players[]`
 
-Player 1 is first. Co-op players, Jacob & Esau and similar follow.
+Player 1 is first. Co-op players, Esau, Tainted Forgotten's Soul, helpers
+such as Strawman's Keeper, and similar follow, in the game's own order
+(`Isaac.GetPlayer`).
 
 ```json
 {
@@ -231,13 +243,19 @@ Player 1 is first. Co-op players, Jacob & Esau and similar follow.
   "trinkets": [ { "slot": 0, "id": 2, "golden": false, "name": "#PETRIFIED_POOP_NAME" } ],
   "pockets": [ { "slot": 0, "kind": "card", "id": 1, "name": "#FOOL_NAME" },
                { "slot": 1, "kind": "pill", "color": 3, "identified": false } ],
+  "pills": [ { "color": 5, "effect": 5, "name": "#FULL_HEALTH_NAME" } ],
   "items": [ { "id": 4, "name": "#CRICKETS_HEAD_NAME" } ],
-  "forms": [ 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
+  "forms": [ 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
+  "controller": 0,
+  "twin": { "index": 1, "main": true }
 }
 ```
 
 | Field | Meaning |
 |---|---|
+| `controller` | The player's `ControllerIndex`. Players on the same controller are one person (Jacob and Esau, a player and their Strawman Keeper). |
+| `twin` | Only for pairs that play as one: Jacob and Esau, Tainted Forgotten and his Soul, Tainted Lazarus and his other form (with Birthright). `index` is the other one's place in `players`; `main` is true for the first of the pair (Jacob, Tainted Forgotten, Tainted Lazarus) and false for the second (Esau…). The app shows the main twin's HUD where a solo player's goes and Esau's in the bottom-right, like the game. |
+| `ghost`, `baby`, `child` | Sent only as `true`. `ghost`: a co-op player who died and is back as a little ghost. `baby`: a co-op baby (the game's co-op babies, Found Soul and the co-op ghosts are all babies). `child`: a helper with a parent player, such as Strawman's Keeper. |
 | `type` | `PlayerType` number; the app uses it for special health (Keeper's coins, The Lost…) and the portrait. |
 | `health.*` | Raw values in half hearts, as the game reports them. `blackMask` is the game's black-heart bit mask over soul-heart slots; `boneMask` marks which heart slots after the red containers are bone hearts. The app rebuilds the heart row from these. |
 | `lives`, `livesMaybe` | Extra lives; `livesMaybe` is true when one depends on chance (Guppy's Collar, Broken Ankh), so the app shows "x1?". |
@@ -247,6 +265,7 @@ Player 1 is first. Co-op players, Jacob & Esau and similar follow.
 | `actives[]` | `slot` 0 primary, 1 Schoolbag, 2–3 pocket actives. `battery` is the extra charge from The Battery. |
 | `trinkets[]` | Up to two; `golden` set for golden trinkets (the ID is sent without the golden bit). |
 | `pockets[]` | Cards and runes (`kind: "card"`), pills (`kind: "pill"`, with `color`, `identified` and, once identified, `effect`). Pocket actives are in `actives`. |
+| `pills[]` | For the pill tracker, which is parked for now (the app doesn't use this yet): every pill colour the run has identified, in colour order (`PillColor` 1–13, the frames of the pills in `ui_cardspills.png`), with its `effect` (`PillEffect`) and `name` **for this player** (PHD and False PHD change some effects). Colours the game hasn't identified are left out. Gold pills are never listed, since they do something different each time. Horse pills share their colour's entry. |
 | `items[]` | Passive and active collectibles **in pickup order**, duplicates kept. Saved with the run, so continuing a run keeps the order. |
 | `forms[]` | Progress toward each transformation, indexed by `PlayerForm` number. |
 | `poops` | Tainted ??? only. `queue` is his upcoming poop spells, next first (up to 6, the length of the game's queue), as `PoopSpellType` numbers (1 normal, 2 corny, 3 burning, 4 stone, 5 stinky, 6 black, 7 holy, 8 liquid, 9 fart, 10 bomb, 11 diarrhea; the frames of `ui_poops.anm2`). `max` is how many poops he can hold. How many he holds now is `pickups.poopMana`. |
@@ -266,6 +285,8 @@ The game's mod API can't read the bag (only REPENTOGON can), so the mod works it
 ## `chances`
 
 Present when the game exposes them: `devil` (0–1) and `planetarium` (0–1).
+The app shows `planetarium` as a ninth stat under the angel chance; the game
+itself doesn't show it.
 
 ## `death`
 
