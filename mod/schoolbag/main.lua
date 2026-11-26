@@ -17,7 +17,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.3.0"
+local VERSION = "0.3.1"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -1699,8 +1699,11 @@ local REMIND_DELAY = 4 * 30 -- game updates to wait before (re)appearing, so the
 local REMIND_Y = 48         -- banner centre, in screen points (where the game puts its own)
 local STREAK_IN, STREAK_OUT = 9, 11 -- frames in the game's TextIn / TextOut animations
 local PAPER_TOP = 12        -- the paper strip's top edge, below the banner centre
-local PAPER_TEXT_W = 134    -- widest detail line that fits on the strip with some paper
-                            -- around it; longer ones get a wider strip
+local PAPER_TEXT_W = 124    -- widest detail line that fits on the strip clear of its torn
+                            -- ends (22 points of paper each side); longer ones get a longer strip
+local PAPER_W = 168         -- the game's strip (gfx/ui/effect_cursepaper.png)
+local PAPER_END = 30        -- each torn end of it; schoolbag_paper.anm2 stretches the middle
+local LETTER_W = 7          -- Upheaval mini's letters, about: for a line the font won't measure
 local PAUSE_HIDE = 45       -- render frames (3/4 s): paused that long means the pause
                             -- menu or a floor change, so the banners hide. Room changes
                             -- pause the game more briefly, and the banners stay up.
@@ -1747,37 +1750,75 @@ local function reminderArt()
   local art = { streak = loadSprite("gfx/ui/ui_streak.anm2") }
   art.title, art.titleDY = loadFont(TITLE_FONTS)
   art.detail, art.detailDY = loadFont(DETAIL_FONTS)
+  art.paper = loadSprite("gfx/ui/schoolbag_paper.anm2")
   remind.art = art
   return art
 end
 
--- The ink streak (layer 0) and its paper strip (layer 1) at x, y, with the
--- title and the detail line on them. A detail line too long for the strip
--- gets a strip stretched to fit, so the words never run off the paper.
+-- How wide a detail line is, in points: the font's own measure, or if the game
+-- won't say, a guess from its length, so a long line still gets a long strip.
+local function detailWidth(art, detail)
+  local w = try(function() return art.detail:GetStringWidth(detail) end)
+  if type(w) == "number" and w > 0 then return w end
+  logOnce("couldn't measure a banner line; guessing its width from its length")
+  local n = try(function() return utf8.len(detail) end) or #detail
+  return n * LETTER_W
+end
+
+-- Whether the paper strip is standing still in this frame of the game's
+-- animation (its plain 168-point frame), rather than flying in or out.
+local function paperStill(anim, frame)
+  return (anim == "Text" and frame >= 8 and frame <= 59) or anim == "TextStay"
+    or (anim == "TextIn" and frame >= 8) or (anim == "TextOut" and frame == 0)
+end
+
+-- A paper strip `width` points long, centred on x, where the game puts its
+-- own: the game's torn ends with its middle stretched between them. Drawn over
+-- the game's strip, it hides it.
+local function drawLongPaper(paper, x, y, width)
+  local zero, left, mid = Vector(0, 0), x - width / 2, width - 2 * PAPER_END
+  paper.Scale = Vector(1, 1)
+  paper:SetFrame("Left", 0)
+  paper:Render(Vector(left, y), zero, zero)
+  paper:SetFrame("Right", 0)
+  paper:Render(Vector(left + width - PAPER_END, y), zero, zero)
+  paper:SetFrame("Middle", 0)
+  paper.Scale = Vector(mid / (PAPER_W - 2 * PAPER_END), 1)
+  paper:Render(Vector(left + PAPER_END, y), zero, zero)
+  paper.Scale = Vector(1, 1)
+end
+
+-- The ink streak and its paper strip at x, y, with the title and the detail
+-- line on them. A detail line too long for the strip gets a longer strip while
+-- the strip stands still, and shows only then, so the words never run off
+-- the paper. A line too long even for the screen is written narrower.
 local function drawStreak(art, anim, frame, x, y, title, detail, words)
   local zero, pos = Vector(0, 0), Vector(x, y)
   local spr = art.streak
   spr:SetFrame(anim, frame)
-  local w = detail and (try(function() return art.detail:GetStringWidth(detail) end) or 0) or 0
   if not detail then
     -- no detail: the ink alone, as the game does for a pill or a card
     if not pcall(spr.RenderLayer, spr, 0, pos, zero, zero) then spr:Render(pos, zero, zero) end
-  elseif w > PAPER_TEXT_W and pcall(spr.RenderLayer, spr, 0, pos, zero, zero) then
-    local ok = pcall(function()
-      spr.Scale = Vector((w + 16) / (PAPER_TEXT_W + 16), 1)
-      spr:RenderLayer(1, pos, zero, zero)
-    end)
-    pcall(function() spr.Scale = Vector(1, 1) end)
-    if not ok then spr:Render(pos, zero, zero) end
-  else
-    spr:Render(pos, zero, zero) -- the ink and its paper strip together
+    if words then art.title:DrawString(title, x - 200, y + art.titleDY, KColor(1, 1, 1, 1), 400, true) end
+    return
+  end
+  spr:Render(pos, zero, zero) -- the ink and its paper strip together
+  local w, margin = detailWidth(art, detail), PAPER_W - PAPER_TEXT_W
+  local most = Isaac.GetScreenWidth() - 16
+  local squeeze = math.min(1, (most - margin) / w)
+  local box = math.min(most, math.max(PAPER_W, 2 * math.ceil((w + margin) / 2))) -- even: whole points each side
+  if box > PAPER_W then
+    if not paperStill(anim, frame) then return end -- the words wait for the strip
+    local ok, err = pcall(drawLongPaper, art.paper, x, y, box)
+    if not ok then logOnce("couldn't draw a long paper strip: " .. shortErr(err)) end
   end
   if words then
     art.title:DrawString(title, x - 200, y + art.titleDY, KColor(1, 1, 1, 1), 400, true)
-    if detail then
-      local box = math.max(168, math.ceil(w) + 16)
-      art.detail:DrawString(detail, x - box / 2, y + PAPER_TOP + art.detailDY, KColor(INK[1], INK[2], INK[3], 1), box, true)
+    local ink, top = KColor(INK[1], INK[2], INK[3], 1), y + PAPER_TOP + art.detailDY
+    if squeeze < 1 and pcall(art.detail.DrawStringScaled, art.detail, detail, x - box / 2, top, squeeze, 1, ink, box, true) then
+      return
     end
+    art.detail:DrawString(detail, x - box / 2, top, ink, box, true)
   end
 end
 

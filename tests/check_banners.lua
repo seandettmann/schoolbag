@@ -2,6 +2,13 @@
 -- hidden: floor names and curses, picked-up items, pills, cards, the boss
 -- bar, and the game's words arriving from the app over POST /strings.
 -- Usage (from the repo root): lua5.3 tests/check_banners.lua   (needs LuaSocket)
+--
+-- Every card's banner is checked too: that its line stays on the paper strip.
+-- With SCHOOLBAG_GAME (a folder of the game's unpacked resources, with
+-- font/upheavalmini.fnt and pocketitems.xml) and SCHOOLBAG_WORDS (the art
+-- bundle's strings/en.json), that's the game's own cards, measured in the
+-- game's own font. Without them (as on GitHub, which has no game files), it's
+-- made-up lines from short to very long, measured at 7 points a letter.
 local socket = require("socket")
 local failures = 0
 local function check(cond, msg)
@@ -27,19 +34,26 @@ Sprite = function()
   function spr:Load(path) self.path = path end
   function spr:IsLoaded() return true end
   function spr:SetFrame(anim, f) self.anim, self.frame = anim, f end
-  function spr:Render(pos) record("sprite", self.path, self.anim .. ":" .. self.frame, pos) end
+  function spr:Render(pos)
+    record("sprite", self.path, self.anim .. ":" .. self.frame, pos)
+    calls[#calls].d = self.Scale and self.Scale.X or 1
+  end
   function spr:RenderLayer(layer, pos)
     record("layer", self.path, self.anim .. ":" .. self.frame, layer)
     if self.Scale and self.Scale.X ~= 1 then record("scale", self.path, self.Scale.X, layer) end
   end
   return spr
 end
+MEASURE = function(s) return #s * 7 end -- about Upheaval mini's; the game's own below, if it's here
 Font = function()
   local f = {}
   function f:Load(path) self.path = path end
   function f:IsLoaded() return true end
-  function f:DrawString(s, x, y, col, box) record("font", s, self.path, { x = x, y = y, box = box }) end
-  function f:GetStringWidth(s) return #s * 7 end -- about Upheaval mini's
+  function f:DrawString(s, x, y, col, box) record("font", s, self.path, { x = x, y = y, box = box, scale = 1 }) end
+  function f:DrawStringScaled(s, x, y, sx, sy, col, box)
+    record("font", s, self.path, { x = x, y = y, box = box, scale = sx })
+  end
+  function f:GetStringWidth(s) return MEASURE(s) end
   return f
 end
 -- items held overhead, pills, cards and bosses
@@ -144,14 +158,46 @@ check(words(c) == "Basement II / Curse of the Blind" and (streak(c) or ""):match
 newFloor(3, 0, 2)
 c = run(20)
 check(words(c):match("^Caves XL / Curse of the Labyrinth"), "Curse of the Labyrinth: Caves XL")
-local wide = find(c, "scale")
-local line = find(c, "font", "Curse of the Labyrinth")
-check(find(c, "layer") and wide and wide.c == 1 and math.abs(wide.b - (154 + 16) / 150) < 0.001
-  and line and line.c.box == 170,
-  "a line too long for the paper strip gets a wider strip, and stays on it")
-newFloor(2, 0, 64)
+-- the long strip drawn this frame, if any: its left and right edges, and whether its parts meet
+local function longPaper(c)
+  local parts = {}
+  for _, x in ipairs(c) do
+    if x.a == "gfx/ui/schoolbag_paper.anm2" then parts[x.b] = { x = x.c.X, y = x.c.Y, scale = x.d } end
+  end
+  if not (parts["Left:0"] and parts["Middle:0"] and parts["Right:0"]) then return nil end
+  local l, m, r = parts["Left:0"], parts["Middle:0"], parts["Right:0"]
+  local joined = l.scale == 1 and r.scale == 1 and m.x == l.x + 30
+    and math.abs(m.x + m.scale * 108 - r.x) < 0.001 and l.y == 48 and m.y == 48 and r.y == 48
+  return l.x, r.x + 30, joined
+end
+-- whether a detail line sits on its strip: the strip (the game's 168 points,
+-- or a long one) reaches at least 22 points past the line at each end, clear
+-- of its torn ends
+local function onPaper(c, line, w)
+  local text = find(c, "font", line)
+  if not text then return false, "not written" end
+  local l, r, joined = longPaper(c)
+  if not l then l, r, joined = 240 - 84, 240 + 84, true end
+  local box = text.c.box
+  w = w * text.c.scale -- a line too long even for the screen is written narrower
+  if math.abs(text.c.x + box / 2 - 240) > 0.001 then return false, "not centred" end
+  if not joined then return false, "the strip's parts don't meet" end
+  if w + 44 > r - l + 0.001 then return false, ("strip %.0f for a %.0f-point line"):format(r - l, w) end
+  if box > r - l + 0.001 then return false, "the text box runs past the strip" end
+  return true
+end
+local ok, why = onPaper(c, "Curse of the Labyrinth", 154)
+local l, r = longPaper(c)
+check(ok and l == 240 - 99 and r == 240 + 99,
+  "a line too long for the paper strip gets a longer one, and stays on it (" .. tostring(why or "ok") .. ")")
+check((streak(c) or ""):match("^sprite Text:%d+$"), "the game's own strip is still drawn underneath")
+c = run(45)
+check(words(c) == "" and not longPaper(c) and (streak(c) or ""):match("^sprite Text:6"),
+  "as the strip flies out, it's the game's size again and the words have gone")
+newFloor(2, 0, 4)
 c = run(20)
-check(not find(c, "scale") and (streak(c) or ""):match("^sprite Text:"), "a line that fits: the strip as it is")
+check(not longPaper(c) and (streak(c) or ""):match("^sprite Text:") and words(c) == "Basement II / Curse of the Lost",
+  "a line that fits: the strip as it is")
 newFloor(1, 4)
 c = run(20)
 check(words(c) == "Downpour I", "the Repentance path: Downpour I")
@@ -213,6 +259,85 @@ W.cards = { [0] = 1, [1] = 3 } -- the drop button swaps them
 c = run(10)
 check(streak(c) == nil, "switching between pockets isn't a pickup")
 W.cards = nil
+
+print("every card's line stays on the paper")
+-- the game's font: its letters' widths, from the .fnt file (BMFont, binary)
+local function gameFont(path)
+  local f = io.open(path, "rb")
+  if not f then return nil end
+  local d = f:read("a")
+  f:close()
+  if d:sub(1, 4) ~= "BMF\3" then return nil end
+  local adv, i = {}, 5
+  while i <= #d do
+    local kind, size = string.unpack("<BI4", d, i)
+    if kind == 4 then
+      for k = i + 5, i + 4 + size, 20 do
+        local id, _, _, _, _, _, _, xadv = string.unpack("<I4I2I2I2I2i2i2i2", d, k)
+        adv[id] = xadv
+      end
+    end
+    i = i + 5 + size
+  end
+  return function(s)
+    local w = 0
+    for _, ch in utf8.codes(s) do
+      w = w + (adv[ch] or adv[utf8.codepoint(utf8.char(ch):upper())] or 0)
+    end
+    return w
+  end
+end
+local cards, source = {}, nil
+local game, wordsFile = os.getenv("SCHOOLBAG_GAME"), os.getenv("SCHOOLBAG_WORDS")
+local measure = game and gameFont(game .. "/font/upheavalmini.fnt")
+local xmlFile = game and io.open(game .. "/other/pocketitems.xml") or (game and io.open(game .. "/pocketitems.xml"))
+local wf = wordsFile and io.open(wordsFile)
+if measure and xmlFile and wf then
+  local gameWords = json.decode(wf:read("a"))
+  for kind, tag in xmlFile:read("a"):gmatch("<(%a+)(%s[^>]-)/>") do
+    local id, name, desc = tag:match('%sid="(%d+)"'), tag:match('%sname="#?([^"]+)"'), tag:match('%sdescription="#?([^"]+)"')
+    if (kind == "card" or kind == "rune") and id and desc and tonumber(id) > 0 then
+      cards[#cards + 1] = { id = tonumber(id), name = gameWords[name] or name, line = gameWords[desc] or desc }
+    end
+  end
+  MEASURE, source = measure, "the game's " .. #cards .. " cards, in the game's own font"
+else
+  local words = { "May", "you", "see", "the", "value", "of", "all", "things", "in", "life", "and", "beyond" }
+  for n = 1, #words * 2 do
+    local t = {}
+    for k = 1, n do t[k] = words[(k - 1) % #words + 1] end
+    cards[#cards + 1] = { id = 200 + n, name = "Card " .. n, line = table.concat(t, " ") }
+  end
+  source = #cards .. " made-up lines, 3 to 120 letters (no game files here)"
+end
+if xmlFile then xmlFile:close() end
+if wf then wf:close() end
+local byId = {}
+for _, card in ipairs(cards) do byId[card.id] = card end
+local getCard = itemConfig.GetCard
+function itemConfig:GetCard(id)
+  local card = byId[id]
+  if card then return { Name = card.name, Description = card.line } end
+  return getCard(self, id)
+end
+local bad, long, widest, squeezed = {}, 0, nil, 0
+for _, card in ipairs(cards) do
+  W.cards = {}
+  run(1)
+  W.cards = { [0] = card.id }
+  c = run(20)
+  local w = MEASURE(card.line)
+  local fine, why = onPaper(c, card.line, w)
+  if not fine then bad[#bad + 1] = card.name .. " (" .. why .. ")" end
+  local text = find(c, "font", card.line)
+  if text and text.c.scale < 1 then squeezed = squeezed + 1 end
+  if w > 124 then long = long + 1 end
+  if not widest or w > widest.w then widest = { w = w, name = card.name } end
+end
+W.cards = nil
+run(80)
+check(#bad == 0, ("%s: all on the paper (%d needed a longer strip, %d written narrower to fit the screen; the longest, %s, is %d points)")
+  :format(source, long, squeezed, widest.name, widest.w) .. (#bad > 0 and ("; off it: " .. table.concat(bad, ", ")) or ""))
 run(80)
 fire(ModCallbacks.MC_USE_CARD, 1, P, 0)
 c = run(10)
