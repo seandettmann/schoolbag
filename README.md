@@ -97,7 +97,10 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
    of the screen all run, "Schoolbag is offline / Needs --luadebug", and
    nothing else happens.
 3. **App:** add this repository to Obtainium and install the latest release.
-   Obtainium will offer updates as they come out.
+   Obtainium will offer updates as they come out. Releases are versions
+   (0.1, 0.2…), with what changed in [`CHANGELOG.md`](CHANGELOG.md). Test
+   builds are pre-releases ("Schoolbag 0.3.0 test 12"), each replacing the
+   last; Obtainium skips them unless you turn on "Include prereleases".
 4. **Bottom screen:** on the Thor, long-press Schoolbag's icon and set
    **Screen Launch** to the bottom screen. (If it opens on the top screen
    anyway, it moves itself to the bottom one.)
@@ -194,6 +197,15 @@ lists any **problems** (parts of the mod that failed) and the game calls that
 didn't answer, and its **Copy state** button copies all of it, with the full
 state, to paste into a chat or an issue. `/state` is the raw data. The game's
 `log.txt` also shows lines starting with `[Schoolbag]`.
+
+**Versions and releases:** the version is `versionName` in `app/build.gradle`
+and `VERSION` in `mod/schoolbag/main.lua` (also in its `metadata.xml`). From
+0.3 on, the app and the mod share the middle number. The first change after a
+release raises the version. Every push to `main` that touches `app/` makes a
+test build, a pre-release that replaces the one before. To release: write the
+version's section in `CHANGELOG.md`, then push the tag `vX.Y.Z`; the build
+publishes "Schoolbag X.Y" with that section as its notes and removes the test
+builds toward it.
 
 **Uploading to the Workshop (Windows):** copy `mod/schoolbag` into the game's
 `mods` folder, run the game's `tools/ModUploader/ModUploader.exe` and choose

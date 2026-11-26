@@ -18,7 +18,9 @@ android {
         minSdk 29
         targetSdk 35
         versionCode((System.getenv('VERSION_CODE') ?: '1') as int)
-        versionName '0.2.0'
+        // the version, raised with the first change after each release (see
+        // CHANGELOG.md); the build adds "-test.<build>" to test builds
+        versionName('0.2.0' + (System.getenv('VERSION_SUFFIX') ?: ''))
     }
 
     signingConfigs {

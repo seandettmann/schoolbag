@@ -1,28 +1,66 @@
-# Builds the Schoolbag app and publishes it as a GitHub Release, which
-# Obtainium picks up. The game's art comes from the private schoolbag-art repo
-# (read with the ART_TOKEN secret), so it never lands in this public repo.
+# Builds the Schoolbag app and publishes it on GitHub, where Obtainium picks
+# it up. The game's art comes from the private schoolbag-art repo (read with
+# the ART_TOKEN secret), so it never lands in this public repo.
+#
+# - A push to main makes a test build: a pre-release "vX.Y.Z-test.N" that
+#   replaces the one before it, so only the newest is ever there. Obtainium
+#   skips pre-releases unless "Include prereleases" is on.
+# - A pushed tag "vX.Y.Z" (matching versionName in app/build.gradle) makes
+#   the release "Schoolbag X.Y", with that version's section of CHANGELOG.md
+#   as its notes, and removes the test builds toward it.
 name: App
 
 on:
   push:
     branches: [main]
-    paths: ['app/**', '.github/workflows/app.yml']
+    tags: ['v*']
+    paths: ['app/**', '.github/workflows/app.yml'] # (tags always build)
   workflow_dispatch:
+    inputs:
+      task:
+        description: What to run
+        type: choice
+        options: [build, tidy-releases]
+        default: build
 
 permissions:
   contents: write
 
 concurrency:
-  group: app-${{ github.ref }}
+  group: app-${{ github.ref }}-${{ inputs.task || 'build' }}
   cancel-in-progress: true
 
 jobs:
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.task == 'build'
     runs-on: ubuntu-latest
     env:
       VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(sed -n "s/.*versionName[( ]*'\([0-9.]*\)'.*/\1/p" app/build.gradle)
+          if [ -z "$VERSION" ]; then echo "::error::No versionName in app/build.gradle"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+              echo "::error::The tag $GITHUB_REF_NAME doesn't match the app's version $VERSION (app/build.gradle)."; exit 1
+            fi
+            awk -v v="## $VERSION" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md | sed '/./,$!d' > notes.md
+            if [ ! -s notes.md ]; then echo "::error::CHANGELOG.md has no section \"## $VERSION\"."; exit 1; fi
+            echo "kind=release" >> "$GITHUB_OUTPUT"
+          else
+            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" > /dev/null 2>&1; then
+              echo "::error::Schoolbag $VERSION is already out. Raise versionName in app/build.gradle for the next version's test builds."; exit 1
+            fi
+            echo "VERSION_SUFFIX=-test.${{ github.run_number }}" >> "$GITHUB_ENV"
+            echo "kind=test" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Art (private repo)
         uses: actions/checkout@v4
@@ -90,19 +128,79 @@ jobs:
       - name: Build
         run: gradle -p app --no-daemon assembleRelease
 
-      - name: Release
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-          KIND: ${{ steps.sign.outputs.kind }}
+          KEY: ${{ steps.sign.outputs.kind }}
+          KIND: ${{ steps.version.outputs.kind }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION=$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" app/build.gradle)
           N=${{ github.run_number }}
-          APK=schoolbag-$VERSION-$N.apk
           BUILT=$(ls app/build/outputs/apk/release/*.apk | grep -v unsigned | head -1)
           if [ -z "$BUILT" ]; then echo "::error::No signed APK was built"; ls -R app/build/outputs/apk; exit 1; fi
-          cp "$BUILT" "$APK"
-          NOTES="Test build $N of the Schoolbag app $VERSION, from $(git rev-parse --short HEAD)."
-          if [ "$KIND" = "throwaway" ]; then
-            NOTES="$NOTES Signed with a throwaway key: uninstall the previous build before installing this one."
+          if [ "$KEY" = "throwaway" ] && [ "$KIND" = "release" ]; then
+            echo "::error::A release needs the real signing key (SIGNING_PASSWORD)."; exit 1
           fi
-          gh release create "app-v$VERSION-$N" "$APK" --title "Schoolbag $VERSION (build $N)" --notes "$NOTES" --target "$GITHUB_SHA"
+          # the pre-releases whose tags match a pattern, but not $2
+          tests() {
+            gh api "repos/$GITHUB_REPOSITORY/releases" --paginate -q '.[] | select(.prerelease) | .tag_name' \
+              | grep -E -e "$1" | grep -vxF "${2:-}" || true
+          }
+          if [ "$KIND" = "release" ]; then
+            APK=schoolbag-$VERSION.apk
+            cp "$BUILT" "$APK"
+            gh release create "v$VERSION" "$APK" --verify-tag --title "Schoolbag ${VERSION%.0}" --notes-file notes.md --latest
+            for t in $(tests "^v${VERSION//./\\.}-test\\."); do gh release delete "$t" --yes --cleanup-tag; done
+          else
+            TAG="v$VERSION-test.$N"
+            APK=schoolbag-$VERSION-test.$N.apk
+            cp "$BUILT" "$APK"
+            NOTES="Test build $N toward Schoolbag $VERSION, from $(git rev-parse --short HEAD). For trying out: the next test build replaces it."
+            if [ "$KEY" = "throwaway" ]; then
+              NOTES="$NOTES Signed with a throwaway key: uninstall the previous build before installing this one."
+            fi
+            gh release create "$TAG" "$APK" --prerelease --latest=false --title "Schoolbag $VERSION test $N" --notes "$NOTES" --target "$GITHUB_SHA"
+            # only the newest test build stays
+            for t in $(tests '-test\.[0-9]+$' "$TAG"); do gh release delete "$t" --yes --cleanup-tag; done
+          fi
+
+  # One-off: the test builds of 0.1.0 and 0.2.0 were published as releases
+  # ("app-v0.1.0-2" ... "app-v0.2.0-9"). This keeps the last build of each
+  # version as its release (v0.1.0, v0.2.0, with CHANGELOG.md's notes) and
+  # deletes the rest, with their tags. Run it from the Actions tab: App, Run
+  # workflow, task "tidy-releases". Safe to run again.
+  tidy-releases:
+    if: github.event_name == 'workflow_dispatch' && inputs.task == 'tidy-releases'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: One release per version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          R=$GITHUB_REPOSITORY
+          exists() { gh api "repos/$R/releases/tags/$1" > /dev/null 2>&1; }
+          for n in 2 3 4 5 6 7; do
+            if exists "app-v0.1.0-$n"; then gh release delete "app-v0.1.0-$n" --yes --cleanup-tag; fi
+          done
+          promote() { # old tag, version, whether it's the latest release
+            old=$1 version=$2 latest=$3
+            if ! exists "$old"; then echo "$old is gone already"; return; fi
+            if ! exists "v$version"; then
+              sha=$(gh api "repos/$R/git/ref/tags/$old" -q .object.sha)
+              if [ "$(gh api "repos/$R/git/ref/tags/$old" -q .object.type)" = tag ]; then
+                sha=$(gh api "repos/$R/git/tags/$sha" -q .object.sha)
+              fi
+              rm -rf dl && mkdir dl
+              gh release download "$old" --dir dl --pattern '*.apk'
+              mv dl/*.apk "dl/schoolbag-$version.apk"
+              awk -v v="## $version" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md | sed '/./,$!d' > notes.md
+              if [ ! -s notes.md ]; then echo "::error::CHANGELOG.md has no section for $version"; exit 1; fi
+              gh release create "v$version" "dl/schoolbag-$version.apk" --target "$sha" \
+                --title "Schoolbag ${version%.0}" --notes-file notes.md --latest="$latest"
+            fi
+            gh release delete "$old" --yes --cleanup-tag
+          }
+          promote app-v0.1.0-8 0.1.0 false
+          promote app-v0.2.0-9 0.2.0 true

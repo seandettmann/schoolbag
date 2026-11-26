@@ -60,6 +60,12 @@ def state(shape=True):
     return s, headers
 
 
+# the Workshop upload's version (metadata.xml) is the mod's own (main.lua)
+import re
+lua_version = re.search(r'^local VERSION = "([^"]+)"', open("mod/schoolbag/main.lua").read(), re.M).group(1)
+xml_version = re.search(r"<version>([^<]+)</version>", open("mod/schoolbag/metadata.xml").read()).group(1)
+check(lua_version == xml_version, f"metadata.xml's version matches main.lua's ({xml_version} vs {lua_version})")
+
 lua = subprocess.Popen(["lua5.3", "tests/run_mod.lua"], stderr=subprocess.PIPE, text=True)
 try:
     time.sleep(0.5)
