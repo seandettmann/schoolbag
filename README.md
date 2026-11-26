@@ -41,23 +41,29 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
-- **Mod 0.3.0:** tested against a stand-in for the game's API (see
-  `tests/`), and in the real game on the Thor up to 0.2.x. 0.3.0 never makes
-  the game wait on the app, sends the state over UDP only when it changes,
-  encodes it about twice as fast, and reports the pause menu, the Map button
-  and its own timing for the app to follow.
-- **App 0.2.0:** tested on the Thor up to 0.1.0's last build. 0.2.0 leaves the
-  controller with the game when you tap, draws only when something changes,
-  brings back the Room tab, and can follow the game's tabs.
+- **Mod 0.3.1** (on the Workshop, private while testing): tested against a
+  stand-in for the game's API (see `tests/`), and in the real game on the
+  Thor up to 0.2.x. Since 0.3.0 it never makes the game wait on the app,
+  sends the state over UDP only when it changes, and reports the pause menu,
+  the Map button and its own timing for the app to follow. 0.3.1 gives a
+  banner line too long for its paper strip (about half the cards) a longer
+  strip.
+- **App 0.3.0** (test builds, the newest a pre-release): 0.2.0 is the last
+  release. 0.3.0 reworks the pages after the first Thor tests: tabs that
+  don't move, a new strip under each page, scrolling grids of 7 a row on the
+  Items and Room tabs, the map staying up between floors, the death page on
+  every tab, and more of the game's sketches on the paper. The test builds
+  are on the Thor for checking.
 
 ## Roadmap
 
 **Next**
-- The rest of the app: Jacob & Esau, the Boss Rush and Hush countdowns,
-  transformations, "killed by", scrolling long runs.
+- The rest of the app: Jacob & Esau (the strip under the map shows Jacob's
+  trinkets and pocket only), the Boss Rush and Hush countdowns,
+  transformations, "killed by".
 - The angel deal chance (the mod doesn't send it yet).
 - The rest of the test checklist on the Thor (banners, boss bar, characters,
-  Jacob & Esau, the Bag of Crafting, death).
+  Jacob & Esau, the Bag of Crafting, death), and the 0.3.0 test builds.
 
 **Parked** (set aside for now, with the work kept)
 - **Pill tracker.** A "Pills" tag on the Items tab opening a page of the 13
@@ -108,7 +114,7 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 3. **App:** add this repository to Obtainium and install the latest release.
    Obtainium will offer updates as they come out. Releases are versions
    (0.1, 0.2…), with what changed in [`CHANGELOG.md`](CHANGELOG.md). Test
-   builds are pre-releases ("Schoolbag 0.3.0 test 12"), each replacing the
+   builds are pre-releases ("Schoolbag 0.3.0 test 16"), each replacing the
    last; Obtainium skips them unless you turn on "Include prereleases".
 4. **Bottom screen:** on the Thor, long-press Schoolbag's icon and set
    **Screen Launch** to the bottom screen. (If it opens on the top screen
@@ -130,7 +136,24 @@ runs while the Bag of Crafting is full), and another mod would keep hiding it.
 
 ## On the bottom screen
 
-- **Tabs:** Map, Items and Room. Tap a tab, or swipe sideways anywhere.
+- **Always there:** your active item and its charge, hearts and extra lives,
+  coins, bombs and keys, and the stats, with the devil deal and Planetarium
+  chances (the angel deal chance is still to come). Along the top, the
+  floor's curses, its name and the run's clock (the wave, in Greed mode).
+- **Tabs:** Map, Items and Room. Tap a tab, or swipe sideways anywhere. The
+  open tab is the bright one with a line under its name.
+- **Map:** the floor's map in the game's own minimap art, as much of it as
+  the game has shown, sized to fill the page. Under it, your trinkets on the
+  left and your pocket on the right. The pocket item you'll use next is on
+  the right with a line under it, and the next one is dimmed beside it; they
+  swap places when you switch. Between floors the map stays until the next
+  one's arrives.
+- **Items** ("My Stuff!") and **Room:** 7 items a row, numbered in the order
+  you picked them up (or, on the Room tab, left to right in the room). Tap
+  one to see it on the card underneath, and tap the card for the game's whole
+  description. With more than three rows, tap the arrow near the bottom of
+  the page or swipe up or down to scroll.
+- **When you die,** every tab shows Isaac's ghost.
 - **Follow the game** (a setting, on by default): the Room tab when you walk
   into a room with items and the Map tab when you leave it, the Map tab when
   you press the game's Map button, and the Items tab while the pause menu is
@@ -142,6 +165,11 @@ runs while the Bag of Crafting is full), and another mod would keep hiding it.
   nothing happening during a run (30 seconds on the pause menu).
   **Brightness** (100, 85 or 70%) darkens the whole bottom screen. The first
   tap on a dimmed screen only wakes it.
+- **Settings** (the gear on the waiting page, between runs): besides the
+  ones above, **Hide the game's HUD** (on by default; off leaves the game's
+  own HUD, banners and boss bar alone) and **Banner language** (the language
+  of the words the mod draws in the game's banners; Automatic follows the
+  Thor's).
 - **About** (in the settings) shows the version, and how fast the app is
   drawing and reading the mod, for testing.
 
@@ -170,8 +198,12 @@ app/                    the Android app (Java): core/ draws the HUD, the rest is
                         Android side; dev/ renders a frame to a PNG on a computer
 docs/protocol.md        what the mod sends (protocol 1)
 mod/schoolbag/          the Workshop mod: main.lua + metadata.xml, and resources/ with
-                        the boss bar's animation file (it points at the game's own image)
-tools/make_bossbar_anm2.py  writes that animation file
+                        animation files for the boss bar and the banners' longer paper
+                        strip (they point at the game's own images)
+tools/make_bossbar_anm2.py  writes the boss bar's animation file
+tools/make_paper_anm2.py    writes the paper strip's animation file
+tools/artbundle/        builds the app's art bundle from the game's extracted files
+                        (the bundle is game art: it lives in a private repo)
 tools/draw_preview.py   draws the Workshop image, mod/preview.png
 tools/draw_icon.py      draws the app icon's layers into app/icon/
 tools/mock_server.py    a fake mod with scenarios, for building the app without the game
@@ -197,6 +229,12 @@ lua5.3 tests/check_banners.lua   # the banners and boss bar drawn in the HUD's p
 lua5.3 tests/check_bag.lua       # tracking what goes into the Bag of Crafting
 lua5.3 tests/check_net.lua       # never blocking the game, keep-alive, UDP, timing
 ```
+
+`check_banners.lua` also checks that every card's line stays on its paper
+strip: with `SCHOOLBAG_GAME` (a folder of the game's unpacked resources, with
+`font/upheavalmini.fnt` and `other/pocketitems.xml`) and `SCHOOLBAG_WORDS`
+(the art bundle's `strings/en.json`) set, the game's own cards in the game's
+own font; without them, made-up lines.
 
 **Trying the mod:** copy `mod/schoolbag` into the game's `mods`
 folder, launch with `--luadebug`, start a run and open
