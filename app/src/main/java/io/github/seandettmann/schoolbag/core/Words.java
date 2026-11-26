@@ -69,7 +69,6 @@ public final class Words {
     public String quote(String kind, int id) { return text(entry(kind, id).get("desc").str()); }
 
     /** The first of the game's own info lines for a collectible, or "". */
-    public String firstLine(int id) { return entry("collectibles", id).get("lines").at(0).str(); }
 
     public java.util.List<Json.J> lines(int id) { return entry("collectibles", id).get("lines").items(); }
 

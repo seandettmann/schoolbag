@@ -15,16 +15,16 @@ final class Cards {
     }
 
     /**
-     * Draws the card's picture in a box the size of a card front at 2x (32 x 48
-     * points), trimmed of its empty border and centred, at the largest whole
-     * zoom that fits.
+     * Draws the card's picture in a box the size of a card front at a zoom (16 x
+     * 24 game pixels a zoom: 48 x 72 points at 3x), trimmed of its empty border
+     * and centred, at the largest whole zoom up to that one that fits.
      */
-    static void draw(Painter p, int id, float x, float y) {
+    static void draw(Painter p, int id, float x, float y, int zoom) {
         String region = "card-" + id;
-        int max = 2;
-        float boxW = 32, boxH = 48;
-        if (rune(id)) { region = "i-rune"; max = 4; }
-        else if (id >= 81 && id <= 97) { boxW = 44; x -= 6; } // soul stones: pickups, a little wider than a card
+        int max = zoom;
+        float boxW = 16 * zoom, boxH = 24 * zoom;
+        if (rune(id)) { region = "i-rune"; max = zoom * 2; }
+        else if (id >= 81 && id <= 97) { boxW = 22 * zoom; x -= 3 * zoom; } // soul stones: pickups, a little wider than a card
         else if (p.size(region) == null) region = "cardfront-Outline";
         int[] b = p.regionBounds(region);
         if (b == null) return;

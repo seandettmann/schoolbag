@@ -177,79 +177,89 @@ final class TabMap {
         h.centered(Face.TITLE, 64, 64, who + " died...", 0, 368 + DOWN, 960, Hud.INK);
     }
 
+    // The strip under the map, between its torn edges, and where its two halves meet.
+    static final float STRIP_X0 = 66, STRIP_X1 = 855, STRIP_MID = (SHEET_BOTTOM + 826) / 2f;
+    static final float STRIP_SPLIT = STRIP_X0 + 0.55f * (STRIP_X1 - STRIP_X0);
+
     /**
-     * The strip under the map: the pocket across the whole first line (its name;
-     * a pill's good, bad or horse in grey after it), the trinkets side by side on
-     * the second. No headings: the pictures say which is which. Cards and runes
-     * show only their names: their descriptions crowded the line.
+     * The strip under the map, as two small cards side by side. The pocket on
+     * the left: its picture, its name and, in grey under it, a pill's good, bad
+     * or horse and what's next in the pocket (or Tainted Cain's bag, in two rows).
+     * The trinkets on the right, a line each. No headings: the pictures say which
+     * is which.
      */
     private static void strip(Hud h, Json.J player) {
         Painter p = h.p();
         Words w = h.words();
-        float top = SHEET_BOTTOM + 26, rowH = 64, gap = 10, x0 = 60, full = 840;
-        float row2 = top + rowH + gap;
+        float cy = STRIP_MID, x0 = STRIP_X0, right = STRIP_SPLIT - 16;
 
-        // line 1: the pocket (or Tainted Cain's bag)
+        // the pocket (or Tainted Cain's bag)
         Json.J bag = player.get("bag");
         List<Json.J> pockets = player.get("pockets").items();
         if (bag.exists()) {
             List<Json.J> its = bag.get("items").items();
+            float step = 36, top = cy - (2 * step - 4) / 2f;
             for (int i = 0; i < 8; i++) {
                 String r = i < its.size() ? "cr-" + its.get(i).integer() : "cr-empty";
-                p.sprite(r, x0 + i * 52, top + 8, 3, 1f);
+                p.sprite(r, x0 + (i % 4) * step, top + (i / 4) * step, 2, 1f);
             }
         } else if (pockets.isEmpty()) {
-            h.text(Face.SMALL, Hud.BODY, Hud.BODY, "Empty pocket", x0, top + 2, Hud.NUMGREY);
+            h.text(Face.SMALL, 44, 48, "Empty pocket", x0, cy - 24, Hud.NUMGREY);
         } else {
             Json.J first = pockets.get(0);
-            String name, line = "";
+            String name, note = "";
             int color = Hud.INK;
+            float px = x0, py = cy - 36;                 // a 48 x 72 box: a card front at 3x
             if (first.get("kind").str().equals("pill")) {
-                int color0 = first.get("color").integer() & 2047;
-                p.sprite("pill-" + color0, x0, top + 8, 2, 1f);
+                String r = "pill-" + (first.get("color").integer() & 2047);
+                int[] s = p.size(r);
+                if (s != null) p.sprite(r, px + (48 - s[0] * 3) / 2f, py + (72 - s[1] * 3) / 2f, 3, 1f);
                 if (first.get("identified").bool()) {
                     int eff = first.get("effect").integer();
                     name = w.text(pillName(h, player, eff));
                     String cls = w.pillClass(eff);
-                    line = cls.equals("+") ? "Good pill" : cls.equals("-") ? "Bad pill" : "";
+                    note = cls.equals("+") ? "Good pill" : cls.equals("-") ? "Bad pill" : "";
                 } else {
                     name = "???";
                     color = Hud.NUMGREY;
                 }
-                if ((first.get("color").integer() & 2048) != 0) line = line.isEmpty() ? "Horse pill" : line + ", horse pill";
+                if ((first.get("color").integer() & 2048) != 0) note = note.isEmpty() ? "Horse pill" : note + ", horse pill";
             } else {
-                int id = first.get("id").integer();
-                Cards.draw(p, id, x0, top + 8);
+                Cards.draw(p, first.get("id").integer(), px, py, 3);
                 name = w.text(first.get("name").str());
             }
-            float nx = x0 + 32 + 14;
-            String shown = h.fit(Face.SMALL, Hud.BODY, name, full - 46);
-            h.text(Face.SMALL, Hud.BODY, Hud.BODY, shown, nx, top + 2, color);
-            float lx = nx + p.width(Face.SMALL, Hud.BODY, shown) + 28;
-            if (!line.isEmpty() && x0 + full - lx > 280)
-                h.text(Face.SMALL, Hud.BODY, Hud.BODY, h.fit(Face.SMALL, Hud.BODY, line, x0 + full - lx), lx, top + 2, Hud.GREY);
+            if (pockets.size() > 1) {
+                String next = nameOf(h, player, pockets.get(1));
+                note = note.isEmpty() ? "Then " + next : note + ", then " + next;
+            }
+            float tx = x0 + 48 + 20, tw = right - tx, th = note.isEmpty() ? 54 : 54 + 44;
+            h.text(Face.TITLE, 48, 54, h.fit(Face.TITLE, 48, name, tw), tx, cy - th / 2f, color);
+            if (!note.isEmpty()) h.text(Face.SMALL, 38, 44, h.fit(Face.SMALL, 38, note, tw), tx, cy - th / 2f + 54, Hud.GREY);
         }
 
-        // line 2: the trinkets, side by side
+        // the trinkets, one a line
+        float x = STRIP_SPLIT + 16;
         List<Json.J> trinkets = player.get("trinkets").items();
-        if (trinkets.isEmpty()) h.text(Face.SMALL, Hud.BODY, Hud.BODY, "No trinkets", x0, row2 + 2, Hud.NUMGREY);
-        // one after the other; if both names don't fit, each gets half
-        List<String> names = new java.util.ArrayList<>();
-        float need = 0;
-        for (int i = 0; i < trinkets.size() && i < 2; i++) {
+        if (trinkets.isEmpty()) {
+            h.text(Face.SMALL, 44, 48, "No trinkets", x, cy - 24, Hud.NUMGREY);
+            return;
+        }
+        int n = Math.min(trinkets.size(), 2);
+        float rowH = 68, y = cy - n * rowH / 2f;
+        for (int i = 0; i < n; i++) {
             Json.J t = trinkets.get(i);
-            String n = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
-            names.add(n);
-            need += 78 + p.width(Face.SMALL, Hud.BODY, n) + (i > 0 ? 40 : 0);
+            String name = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
+            p.picture("trinkets", t.get("id").integer(), x, y + 2, 2, 1f, false);
+            h.text(Face.SMALL, 40, 48, h.fit(Face.SMALL, 40, name, STRIP_X1 - x - 72), x + 72, y + 12, Hud.INK);
+            y += rowH;
         }
-        float x = x0;
-        for (int i = 0; i < names.size(); i++) {
-            float room = need <= full ? p.width(Face.SMALL, Hud.BODY, names.get(i)) : (full / names.size() - 40 - 78);
-            p.picture("trinkets", trinkets.get(i).get("id").integer(), x, row2, 2, 1f, false);
-            String shown = h.fit(Face.SMALL, Hud.BODY, names.get(i), room);
-            h.text(Face.SMALL, Hud.BODY, Hud.BODY, shown, x + 64 + 14, row2 + 2, Hud.INK);
-            x += 78 + (need <= full ? p.width(Face.SMALL, Hud.BODY, shown) : room) + 40;
-        }
+    }
+
+    /** A pocket item's name: a card's, an identified pill's, or ??? for a pill not yet known. */
+    private static String nameOf(Hud h, Json.J player, Json.J it) {
+        if (!it.get("kind").str().equals("pill")) return h.words().text(it.get("name").str());
+        if (!it.get("identified").bool()) return "???";
+        return h.words().text(pillName(h, player, it.get("effect").integer()));
     }
 
     private static String pillName(Hud h, Json.J player, int effect) {

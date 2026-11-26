@@ -39,7 +39,7 @@ final class TabRoom {
         if (ui.roomDetail && !peds.get(ui.roomSel).get("blind").bool()) {
             h.itemDetail(peds.get(ui.roomSel).get("id").integer());
             Json.J sel = peds.get(ui.roomSel);
-            h.itemCard(sel.get("id").integer(), sel.get("name").str(), false, 790, true,
+            h.itemCard(sel.get("id").integer(), sel.get("name").str(), false, true,
                     "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
             return;
         }
@@ -73,7 +73,7 @@ final class TabRoom {
         }
         Json.J sel = peds.get(ui.roomSel);
         boolean blind = sel.get("blind").bool();
-        h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, 790, ui.roomDetail,
+        h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, ui.roomDetail,
                 "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
     }
 

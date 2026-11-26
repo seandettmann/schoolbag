@@ -170,28 +170,28 @@ public final class Hud {
             p.sprite("c_question", x, y, zoom, alpha);
     }
 
+    // The card in the strip at the bottom of the Items and Room tabs: its left
+    // and right ends (the strip's torn edges) and the middle of its height.
+    static final float CARD_X0 = 66, CARD_X1 = 855, CARD_MID = 726;
+
     /**
-     * The card at the bottom of the Items and Room tabs: the item's picture, name
-     * and pickup line, and the first of the game's info lines. Tapping it opens
-     * (or closes) the item's full description.
+     * The card at the bottom of the Items and Room tabs: the item's picture at 4x,
+     * its name and pickup line beside it. Tapping it opens (or closes) the item's
+     * full description above; while that's open, a grey line under the pickup
+     * line says how to close it.
      */
-    void itemCard(int id, String nameCode, boolean blind, float stripW, boolean open, String back, Runnable toggle) {
-        float cx = 72, cy = 580 + EXTRA * 3;
-        p.save();
-        p.clip(cx, cy, 790, 216);
-        if (blind) {
-            p.sprite("c_question", cx, cy + 2, 3, 1f);
-            text(Face.TITLE, NAME, NAME, "???", cx + 120, cy, INK);
-            text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, "Curse of the Blind hides this one", 670), cx + 120, cy + 76, GREY);
-        } else {
-            itemCell("items", id, cx, cy + 2, 3, 1f);
-            text(Face.TITLE, NAME, NAME, fit(Face.TITLE, NAME, w.text(nameCode), 670), cx + 120, cy, INK);
-            text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, w.quote("collectibles", id), 670), cx + 120, cy + 76, GREY);
-            if (open) text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, back, stripW), cx, cy + 146, GREY);
-            else text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, w.firstLine(id), stripW), cx, cy + 146, INK);
-        }
-        p.restore();
-        if (!blind) ui.hit(MX + cx, MY + cy, 790, 216, toggle);
+    void itemCard(int id, String nameCode, boolean blind, boolean open, String back, Runnable toggle) {
+        float x0 = CARD_X0, cy = CARD_MID;
+        if (blind) p.sprite("c_question", x0, cy - 64, 4, 1f);
+        else itemCell("items", id, x0, cy - 64, 4, 1f);
+        String name = blind ? "???" : w.text(nameCode);
+        String quote = blind ? "Curse of the Blind hides this one" : w.quote("collectibles", id);
+        float tx = x0 + 128 + 32, tw = CARD_X1 - tx;
+        float top = cy - (70 + 54 + (open ? 46 : 0)) / 2f;
+        text(Face.TITLE, 64, 70, fit(Face.TITLE, 64, name, tw), tx, top, INK);
+        text(Face.SMALL, 48, 54, fit(Face.SMALL, 48, quote, tw), tx, top + 70, GREY);
+        if (open) text(Face.SMALL, 40, 46, fit(Face.SMALL, 40, back, tw), tx, top + 124, NUMGREY);
+        if (!blind) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
     }
 
     /** An item's full description, in the space above the card: the game's info lines, or its pickup line. */

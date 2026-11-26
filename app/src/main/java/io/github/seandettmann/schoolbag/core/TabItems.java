@@ -72,7 +72,7 @@ final class TabItems {
         // the card for the selected item
         if (selIndex >= 0) {
             Cell c = cells.get(selIndex);
-            h.itemCard(c.id, c.name, false, 790, detail, "Tap here again for all your items", () -> ui.detail = !ui.detail);
+            h.itemCard(c.id, c.name, false, detail, "Tap here again for all your items", () -> ui.detail = !ui.detail);
         }
     }
 
