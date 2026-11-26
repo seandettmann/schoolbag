@@ -39,17 +39,21 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
-- **Mod 0.2.1:** tested against a stand-in for the game's API (see
+- **Mod 0.2.2:** tested against a stand-in for the game's API (see
   `tests/`), and a first round in the real game on the Thor (0.2.0). 0.2.1
-  fixes what that round found: `/watch` hanging on the menus, the offline
+  fixed what that round found: `/watch` hanging on the menus, the offline
   banner blinking between rooms and sitting under the game's card banner, and
-  the banners' fonts not matching the game's.
-- **App:** not started yet. The design mock-ups are done.
+  the banners' fonts not matching the game's. 0.2.2 stops the boss bar
+  flashing white when the boss is hit.
+- **App 0.1.0:** first test builds on the Thor, built by GitHub from `app/`
+  and published as releases for Obtainium.
 
 ## Roadmap
 
 **Next**
-- The app, built from the finished mock-ups.
+- The rest of the app: Jacob & Esau, the Boss Rush and Hush countdowns,
+  transformations, "killed by", every card's picture, scrolling long runs.
+- The angel deal chance (the mod doesn't send it yet).
 - The rest of the test checklist on the Thor (banners, boss bar, characters,
   Jacob & Esau, the Bag of Crafting, death).
 

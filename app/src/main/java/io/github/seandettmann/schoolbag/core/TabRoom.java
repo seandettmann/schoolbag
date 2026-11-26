@@ -29,15 +29,22 @@ final class TabRoom {
         List<Json.J> peds = room.get("pedestals").items();
         // a new room: select the first item
         int idx = room.get("index").integer(-1);
-        if (idx != ui.roomIndexSeen) { ui.roomIndexSeen = idx; ui.roomSel = 0; }
+        if (idx != ui.roomIndexSeen) { ui.roomIndexSeen = idx; ui.roomSel = 0; ui.roomDetail = false; }
         if (peds.isEmpty()) {
             p.sprite("doodle_006", 391, 140, 3, 1f);
-            h.centered(Face.SMALL, 50, 50, "Nothing to pick up in here.", 96, 438, 768, Hud.INK);
+            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, "Nothing to pick up in here.", 96, 434, 768, Hud.INK);
+            return;
+        }
+        if (ui.roomSel >= peds.size()) ui.roomSel = 0;
+        if (ui.roomDetail && !peds.get(ui.roomSel).get("blind").bool()) {
+            h.itemDetail(peds.get(ui.roomSel).get("id").integer());
+            Json.J sel = peds.get(ui.roomSel);
+            h.itemCard(sel.get("id").integer(), sel.get("name").str(), false, 790, true,
+                    "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
             return;
         }
         p.sprite("doodle_033", 560, 300, 2, 0.13f);
         p.sprite("wm_poop", 96, 380, 2, 0.14f);
-        if (ui.roomSel >= peds.size()) ui.roomSel = 0;
         // items that share an options group: a pencil loop round them, "Take one" under it
         int g0 = -1, g1 = -1, group = 0;
         for (int i = 0; i < peds.size(); i++) {
@@ -47,7 +54,7 @@ final class TabRoom {
         if (group > 0 && g1 > g0) {
             float lx = 84 + g0 * 120 - 22;
             p.sprite("loop2", lx, 122, 3, 1f);
-            h.centered(Face.SMALL, 40, 40, "Take one", lx, 306, 261, Hud.INK);
+            h.centered(Face.SMALL, 48, 48, "Take one", lx, 302, 261, Hud.INK);
         }
         for (int i = 0; i < peds.size() && i < 7; i++) {
             Json.J ped = peds.get(i);
@@ -62,24 +69,12 @@ final class TabRoom {
             else h.itemCell("items", ped.get("id").integer(), x, y, 3, 1f);
             h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
             final int k = i;
-            ui.hit(Hud.MX + x - 5, Hud.MY + y - 5, 106, 127, () -> ui.roomSel = k);
+            ui.hit(Hud.MX + x - 5, Hud.MY + y - 5, 106, 127, () -> { ui.roomSel = k; ui.roomDetail = false; });
         }
         Json.J sel = peds.get(ui.roomSel);
-        float cx = 72, cy = 580;
-        p.save();
-        p.clip(cx, cy, 790, 216);
-        if (sel.get("blind").bool()) {
-            p.sprite("c_question", cx, cy + 2, 3, 1f);
-            h.text(Face.TITLE, 64, 64, "???", cx + 120, cy + 2, Hud.INK);
-            h.text(Face.SMALL, 50, 50, "Curse of the Blind hides this one", cx + 120, cy + 70, Hud.GREY);
-        } else {
-            int id = sel.get("id").integer();
-            h.itemCell("items", id, cx, cy + 2, 3, 1f);
-            h.text(Face.TITLE, 64, 64, h.fit(Face.TITLE, 64, w.text(sel.get("name").str()), 670), cx + 120, cy + 2, Hud.INK);
-            h.text(Face.SMALL, 50, 50, h.fit(Face.SMALL, 50, w.quote("collectibles", id), 670), cx + 120, cy + 70, Hud.GREY);
-            h.text(Face.SMALL, 50, 50, h.fit(Face.SMALL, 50, w.firstLine(id), 790), cx, cy + 126, Hud.INK);
-        }
-        p.restore();
+        boolean blind = sel.get("blind").bool();
+        h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, 790, ui.roomDetail,
+                "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
     }
 
     /** The room's name, where it has a type worth naming. */

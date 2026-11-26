@@ -243,9 +243,7 @@ check(b == "Back:0 + Fill:61", "two bosses: one bar for both (55 of 100 HP)")
 check(pos and pos.X == 240 and pos.Y == 248, "centred at the bottom of the screen")
 W.bosses[1].hp = 20
 c = run(1)
-check(bar(c) == "Back:0 + FillHit:50", "a hit flashes it")
-c = run(3)
-check(bar(c) == "Back:0 + Fill:50", "then back to red")
+check(bar(c) == "Back:0 + Fill:50", "a hit just shortens it, with no white flash")
 W.bosses[3] = { hp = 500, max = 500, friendly = true }
 c = run(1)
 check(bar(c) == "Back:0 + Fill:50", "friendly bosses don't count")

@@ -20,6 +20,7 @@ public final class Ui {
     public int roomSel = 0;
     /** The item card swapped for the item's full description. */
     public boolean detail = false;
+    public boolean roomDetail = false;
     public int roomIndexSeen = -1;
     public int itemCountSeen = -1;
 
@@ -28,7 +29,8 @@ public final class Ui {
 
     public boolean hideHud = true;
     public boolean dim = true;
-    public boolean roomOnWalkIn = false;
+    /** Follow the room: the Room tab in a room with items, back to the Map tab on leaving. */
+    public boolean roomOnWalkIn = true;
     public String language = "auto";
     /** Set when the language changes, so the app sends the mod the new words. */
     public boolean languageChanged = false;

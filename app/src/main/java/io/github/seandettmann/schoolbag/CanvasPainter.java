@@ -116,6 +116,26 @@ final class CanvasPainter implements Painter {
         return q == null ? null : new int[]{q[2], q[3]};
     }
 
+    @Override public int[] regionBounds(String region) {
+        String k = "region:" + region;
+        if (bounds.containsKey(k)) return bounds.get(k);
+        int[] q = regions.get(region);
+        Bitmap b = q == null ? null : bitmap("sheets/" + regionSheet.get(region));
+        int[] r = null;
+        if (b != null) {
+            int minX = q[2], minY = q[3], maxX = -1, maxY = -1;
+            for (int y = 0; y < q[3]; y++)
+                for (int x = 0; x < q[2]; x++)
+                    if ((b.getPixel(q[0] + x, q[1] + y) >>> 24) > 0) {
+                        minX = Math.min(minX, x); minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+                    }
+            r = maxX < 0 ? new int[]{0, 0, q[2], q[3]} : new int[]{minX, minY, maxX - minX + 1, maxY - minY + 1};
+        }
+        bounds.put(k, r);
+        return r;
+    }
+
     private Bitmap picture(String kind, int id) { return bitmap(kind + "/" + id + ".png"); }
 
     @Override public boolean picture(String kind, int id, float x, float y, float zoom, float alpha, boolean trim) {

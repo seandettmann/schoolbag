@@ -141,7 +141,7 @@ The mod never sends what the game is hiding from the player:
 ```json
 {
   "protocol": 1,
-  "mod": { "name": "Schoolbag", "version": "0.2.1" },
+  "mod": { "name": "Schoolbag", "version": "0.2.2" },
   "inRun": true,
   "paused": false,
   "humans": 1,

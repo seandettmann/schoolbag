@@ -21,6 +21,9 @@ public interface Painter {
     /** Width and height of a region in its own pixels, or null if the bundle doesn't have it. */
     int[] size(String region);
 
+    /** The drawn (not see-through) part of a region: {x, y, w, h} in its own pixels, or null. */
+    int[] regionBounds(String region);
+
     /**
      * An item picture from the bundle ("items" or "trinkets", by ID): its whole
      * 32 x 32 frame, or (trim) just its drawn pixels, top-left at x, y, at a

@@ -14,7 +14,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.2.1"
+local VERSION = "0.2.2"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -1718,7 +1718,7 @@ end
 -- The boss bar: every boss in the room added together, as the game does.
 local BOSSBAR_FILL = 110 -- columns in the bar's fill (frames 0-110 of "Fill")
 local BOSSBAR_FROM_BOTTOM = 22
-local boss = { hp = 0, max = 0, flashUntil = 0 }
+local boss = { hp = 0, max = 0 }
 local bossBar = nil
 
 local function scanBosses()
@@ -1730,7 +1730,6 @@ local function scanBosses()
       max = max + e.MaxHitPoints
     end
   end
-  if boss.max > 0 and hp < boss.hp then boss.flashUntil = now() + 2 end -- a hit flashes the bar
   boss.hp, boss.max = hp, max
 end
 
@@ -1744,7 +1743,7 @@ local function drawBossBar()
   bossBar:Render(pos, zero, zero)
   local k = math.floor(boss.hp / boss.max * BOSSBAR_FILL + 0.5)
   k = math.max(1, math.min(BOSSBAR_FILL, k))
-  bossBar:SetFrame(now() < boss.flashUntil and "FillHit" or "Fill", k)
+  bossBar:SetFrame("Fill", k) -- no white flash on a hit (Sean, from the Thor)
   bossBar:Render(pos, zero, zero)
 end
 

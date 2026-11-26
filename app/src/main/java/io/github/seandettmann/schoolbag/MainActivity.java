@@ -26,7 +26,7 @@ public final class MainActivity extends Activity {
         view.ui.appVersion = BuildConfig.VERSION_NAME;
         view.ui.hideHud = prefs.getBoolean("hideHud", true);
         view.ui.dim = prefs.getBoolean("dim", true);
-        view.ui.roomOnWalkIn = prefs.getBoolean("roomOnWalkIn", false);
+        view.ui.roomOnWalkIn = prefs.getBoolean("roomOnWalkIn", true);
         view.ui.language = prefs.getString("language", "auto");
         view.words = App.words(getAssets(), view.ui.language);
         view.onChange = this::settingsChanged;

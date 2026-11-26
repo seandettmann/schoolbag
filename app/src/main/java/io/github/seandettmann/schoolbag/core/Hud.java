@@ -16,6 +16,11 @@ public final class Hud {
             FLOORTEXT = 0xFFBDB0A2, CURSETEXT = 0xFFE6CCF7, BLACK = 0xFF000000, PAPER = 0xFFC7B29A;
     // the main page's box
     static final int MX = 272, MY = 246;
+    // text sizes, a step up from the mock-ups after the first look on the Thor
+    static final float LINE = 54;      // the header's floor and curse
+    static final float NAME = 72;      // an item's name on its card
+    static final float BODY = 60;      // the small hand lettering on cards and strips
+    static final float DETAIL = 46;    // an item's full description
 
     private final Painter p;
     private final Ui ui;
@@ -126,6 +131,48 @@ public final class Hud {
             p.sprite("c_question", x, y, zoom, alpha);
     }
 
+    /**
+     * The card at the bottom of the Items and Room tabs: the item's picture, name
+     * and pickup line, and the first of the game's info lines. Tapping it opens
+     * (or closes) the item's full description.
+     */
+    void itemCard(int id, String nameCode, boolean blind, float stripW, boolean open, String back, Runnable toggle) {
+        float cx = 72, cy = 580;
+        p.save();
+        p.clip(cx, cy, 790, 216);
+        if (blind) {
+            p.sprite("c_question", cx, cy + 2, 3, 1f);
+            text(Face.TITLE, NAME, NAME, "???", cx + 120, cy, INK);
+            text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, "Curse of the Blind hides this one", 670), cx + 120, cy + 76, GREY);
+        } else {
+            itemCell("items", id, cx, cy + 2, 3, 1f);
+            text(Face.TITLE, NAME, NAME, fit(Face.TITLE, NAME, w.text(nameCode), 670), cx + 120, cy, INK);
+            text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, w.quote("collectibles", id), 670), cx + 120, cy + 76, GREY);
+            if (open) text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, back, stripW), cx, cy + 146, GREY);
+            else text(Face.SMALL, BODY, BODY, fit(Face.SMALL, BODY, w.firstLine(id), stripW), cx, cy + 146, INK);
+        }
+        p.restore();
+        if (!blind) ui.hit(MX + cx, MY + cy, 790, 216, toggle);
+    }
+
+    /** An item's full description, in the space above the card: the game's info lines, or its pickup line. */
+    void itemDetail(int id) {
+        List<String> lines = new ArrayList<>();
+        for (Json.J l : w.lines(id)) lines.add(l.str());
+        if (lines.isEmpty()) lines.add(w.quote("collectibles", id));
+        p.save();
+        p.clip(60, 96, 830, 400);
+        float y = 108;
+        for (String line : lines) {
+            for (String l : wrap(Face.SMALL, DETAIL, line, 800)) {
+                text(Face.SMALL, DETAIL, 54, l, 72, y, INK);
+                y += 54;
+            }
+            y += 10;
+        }
+        p.restore();
+    }
+
     float spriteW(String region, float zoom) { int[] s = p.size(region); return s == null ? 0 : s[0] * zoom; }
     float spriteH(String region, float zoom) { int[] s = p.size(region); return s == null ? 0 : s[1] * zoom; }
 
@@ -197,7 +244,7 @@ public final class Hud {
         int difficulty = run.get("difficulty").integer();
         boolean greed = difficulty >= 2;
         String clock = clock(run.get("timeFrames").lng());
-        float right = W - 24, top = 20;
+        float right = W - 24, top = 18;
         // line 1: floor name, then the clock (or Greed's wave)
         String name = Floors.name(w, floor, s.get("map").get("mirrored").bool());
         if (greed) {
@@ -213,7 +260,7 @@ public final class Hud {
                     {"num", clock}});
         }
         // line 2: the curse (or the mode, or the mirror world)
-        float top2 = top + 50 + 10;
+        float top2 = top + LINE + 8;
         String mode = greed ? (difficulty == 3 ? "Greedier!" : "Greed Mode") : run.get("challenge").integer() > 0 ? "Challenge" : "";
         int curses = floor.get("curses").integer();
         int ci = Floors.firstCurse(curses);
@@ -243,7 +290,7 @@ public final class Hud {
         for (int i = 0; i < items.length; i++) {
             Object[] it = items[i];
             switch ((String) it[0]) {
-                case "text": widths[i] = p.width(Face.SMALL, 50, (String) it[1]); break;
+                case "text": widths[i] = p.width(Face.SMALL, LINE, (String) it[1]); break;
                 case "num": widths[i] = p.width(Face.NUMBER, 39, (String) it[1]); break;
                 case "sprite": widths[i] = spriteW((String) it[1], 2) + (Float) it[2] + (Float) it[3]; break;
                 case "icon": widths[i] = spriteW((String) it[1], 2); break;
@@ -256,19 +303,19 @@ public final class Hud {
             Object[] it = items[i];
             switch ((String) it[0]) {
                 case "text":
-                    outlined(Face.SMALL, 50, 50, (String) it[1], x, top, it.length > 2 ? (Integer) it[2] : FLOORTEXT, 3);
+                    outlined(Face.SMALL, LINE, LINE, (String) it[1], x, top, it.length > 2 ? (Integer) it[2] : FLOORTEXT, 3);
                     break;
                 case "num":
-                    outlined(Face.NUMBER, 39, 39, (String) it[1], x, top + (50 - 39) / 2f, FLOORTEXT, 3);
+                    outlined(Face.NUMBER, 39, 39, (String) it[1], x, top + (LINE - 39) / 2f, FLOORTEXT, 3);
                     break;
                 case "sprite":
-                    p.sprite((String) it[1], x + (Float) it[2], top + (50 - spriteH((String) it[1], 2)) / 2f, 2, 1f);
+                    p.sprite((String) it[1], x + (Float) it[2], top + (LINE - spriteH((String) it[1], 2)) / 2f, 2, 1f);
                     break;
                 case "icon":
-                    p.sprite((String) it[1], x, top + (50 - spriteH((String) it[1], 2)) / 2f, 2, 1f);
+                    p.sprite((String) it[1], x, top + (LINE - spriteH((String) it[1], 2)) / 2f, 2, 1f);
                     break;
                 case "icon3":
-                    p.sprite((String) it[1], x - 8, top + (50 - spriteH((String) it[1], 3)) / 2f, 3, 1f);
+                    p.sprite((String) it[1], x - 8, top + (LINE - spriteH((String) it[1], 3)) / 2f, 3, 1f);
                     break;
             }
             x += widths[i] + gap;
@@ -291,8 +338,9 @@ public final class Hud {
         if (type == 25) rows.add(new String[]{"p-poop", two(pk.get("poopMana").integer())});   // Tainted ???
         else rows.add(new String[]{"p-bomb", two(pk.get("bombs").integer())});
         rows.add(new String[]{"p-key", two(pk.get("keys").integer())});
-        if (pk.has("soulCharge")) rows.add(new String[]{"p-soul", two(pk.get("soulCharge").integer())});
-        if (pk.has("bloodCharge")) rows.add(new String[]{"p-blood", two(pk.get("bloodCharge").integer())});
+        // the game sends both charges for everyone; only the Bethanys use them
+        if (type == 18) rows.add(new String[]{"p-soul", two(pk.get("soulCharge").integer())});
+        if (type == 36) rows.add(new String[]{"p-blood", two(pk.get("bloodCharge").integer())});
         boolean poops = type == 25 && player.has("poops");
         boolean tall = rows.size() > 3 || poops;
         float x0 = 22, y0 = 176;

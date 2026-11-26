@@ -35,6 +35,8 @@ final class HudView extends View implements Poller.Listener {
     private volatile String signature = "";
     private volatile long lastChange = System.currentTimeMillis();
     private float scale = 1, ox, oy;
+    private int lastRoom = -1;
+    private boolean lastRoomItems = false;
     private int[] shift = SHIFT[0];
 
     HudView(Context c) {
@@ -56,10 +58,20 @@ final class HudView extends View implements Poller.Listener {
         if (!ui.everAnswered || (state != null && !state.get("inRun").bool() && s.get("inRun").bool())) {
             ui.newPaper();
         }
-        // walking into a room with items: the Room tab, if that's switched on
+        // following the room (if that's switched on): the Room tab in a room with
+        // items (or when items turn up), the Map tab again on leaving it
         int room = s.get("room").get("index").integer(-1);
-        if (ui.roomOnWalkIn && state != null && room != state.get("room").get("index").integer(-1)
-                && s.get("room").get("pedestals").size() > 0) ui.tab = "room";
+        boolean items = s.get("room").get("pedestals").size() > 0;
+        if (ui.roomOnWalkIn && state != null && s.get("inRun").bool()) {
+            if (room != lastRoom) {
+                if (items) ui.tab = "room";
+                else if (lastRoomItems) ui.tab = "map";
+            } else if (items && !lastRoomItems) {
+                ui.tab = "room";
+            }
+        }
+        lastRoom = room;
+        lastRoomItems = items;
         state = s;
         lastAnswer = now;
         ui.everAnswered = true;

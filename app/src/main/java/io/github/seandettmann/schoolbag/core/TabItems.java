@@ -46,15 +46,7 @@ final class TabItems {
         p.sprite("wm_bible", 790, 660, 2, 0.14f);
 
         if (detail) {
-            Cell c = cells.get(selIndex);
-            float y = 108;
-            for (Json.J line : w.lines(c.id)) {
-                for (String l : h.wrap(Face.SMALL, 36, line.str(), 800)) {
-                    h.text(Face.SMALL, 36, 42, l, 72, y, Hud.INK);
-                    y += 42;
-                }
-                y += 10;
-            }
+            h.itemDetail(cells.get(selIndex).id);
         } else if (cells.size() <= 21) {
             // 7 across at 3x
             for (int i = 0; i < cells.size(); i++) {
@@ -80,17 +72,7 @@ final class TabItems {
         // the card for the selected item
         if (selIndex >= 0) {
             Cell c = cells.get(selIndex);
-            float cx = 72, cy = 580;
-            p.save();
-            p.clip(cx, cy, 790, 216);
-            h.itemCell("items", c.id, cx, cy + 2, 3, 1f);
-            h.text(Face.TITLE, 64, 64, h.fit(Face.TITLE, 64, w.text(c.name), 670), cx + 120, cy + 2, Hud.INK);
-            h.text(Face.SMALL, 50, 50, h.fit(Face.SMALL, 50, w.quote("collectibles", c.id), 670), cx + 120, cy + 70, Hud.GREY);
-            if (detail) h.text(Face.SMALL, 50, 50, "Tap here again for all your items", cx, cy + 126, Hud.GREY);
-            else h.text(Face.SMALL, 50, 50, h.fit(Face.SMALL, 50, w.firstLine(c.id), 790), cx, cy + 126, Hud.INK);
-            p.restore();
-            if (!w.lines(c.id).isEmpty() || detail)
-                ui.hit(Hud.MX + cx, Hud.MY + cy, 790, 216, () -> ui.detail = !ui.detail);
+            h.itemCard(c.id, c.name, false, 790, detail, "Tap here again for all your items", () -> ui.detail = !ui.detail);
         }
     }
 
