@@ -214,7 +214,7 @@ final class TabMap {
                 if ((first.get("color").integer() & 2048) != 0) line = line.isEmpty() ? "Horse pill" : line + ", horse pill";
             } else {
                 int id = first.get("id").integer();
-                p.sprite(Cards.region(id), x0, top + 8, 2, 1f);
+                Cards.draw(p, id, x0, top + 8);
                 name = w.text(first.get("name").str());
             }
             float nx = x0 + 32 + 14;

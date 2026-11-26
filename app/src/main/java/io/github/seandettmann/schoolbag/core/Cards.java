@@ -1,17 +1,36 @@
 package io.github.seandettmann.schoolbag.core;
 
-/** The game's small card fronts (ui_cardfronts.anm2) for the pocket. */
+/**
+ * A pocket card's picture, as the game's HUD shows it: every card by its ID
+ * (card-&lt;id&gt;, from ui_cardspills.anm2), soul stones as their pickups, and
+ * runes as the game's own rune icon (the minimap's), since the game's card
+ * sheet has none.
+ */
 final class Cards {
     private Cards() {}
 
-    // the tarot cards, IDs 1-22, in the game's order
-    private static final String[] TAROT = {"00_TheFool", "01_TheMagician", "02_TheHighPriestess", "03_TheEmpress",
-            "04_TheEmperor", "05_TheHierophant", "06_TheLovers", "07_TheChariot", "08_TheJustice", "09_TheHermit",
-            "10_WheelOfFortune", "11_Strength", "12_TheHangedMan", "13_Death", "14_Temperance", "15_TheDevil",
-            "16_TheTower", "17_TheStars", "18_TheMoon", "19_TheSun", "20_Judgement", "21_TheWorld"};
+    /** Hagalaz to Black Rune, and the Rune Shard. */
+    static boolean rune(int id) {
+        return (id >= 32 && id <= 41) || id == 55;
+    }
 
-    static String region(int id) {
-        if (id >= 1 && id <= TAROT.length) return "cardfront-" + TAROT[id - 1];
-        return "cardfront-Outline";
+    /**
+     * Draws the card's picture in a box the size of a card front at 2x (32 x 48
+     * points), trimmed of its empty border and centred, at the largest whole
+     * zoom that fits.
+     */
+    static void draw(Painter p, int id, float x, float y) {
+        String region = "card-" + id;
+        int max = 2;
+        float boxW = 32, boxH = 48;
+        if (rune(id)) { region = "i-rune"; max = 4; }
+        else if (id >= 81 && id <= 97) { boxW = 44; x -= 6; } // soul stones: pickups, a little wider than a card
+        else if (p.size(region) == null) region = "cardfront-Outline";
+        int[] b = p.regionBounds(region);
+        if (b == null) return;
+        int z = max;
+        while (z > 1 && (b[2] * z > boxW || b[3] * z > boxH)) z--;
+        p.spritePart(region, b[0], b[1], b[2], b[3],
+                x + (float) Math.floor((boxW - b[2] * z) / 2), y + (float) Math.floor((boxH - b[3] * z) / 2), z, 1f);
     }
 }

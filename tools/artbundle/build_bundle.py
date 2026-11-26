@@ -8,7 +8,8 @@ app/src/main/assets/art.
         --trinkets <gfx/items/trinkets> --data <folder with items.xml,
         pocketitems.xml, info_display.xml and stringtable.sta> \
         --sheets <folder with the mock-up sheets: atlas.png/json,
-        health_sheet, map_sheet, pills_sheet, and the extra pieces>
+        health_sheet, map_sheet, pills_sheet, and the extra pieces> \
+        --pickups <gfx/items/pick ups>
 
 The mock-up sheets (papers in the game's tan palette, tab scraps, heart and
 map sheets...) are made from the same extraction by the mock-up scripts;
@@ -16,7 +17,8 @@ folding those scripts in here, so the whole bundle comes from one extraction,
 is next on the list.
 
 What comes out:
-    regions.json     every named sprite: [sheet file, x, y, w, h]
+    regions.json     every named sprite: [sheet file, x, y, w, h], including
+                     card-<id>: every card's and soul stone's pocket picture
     sheets/          the sprite sheets
     fonts/           the game's fonts, as TrueType
     items/<id>.png   every collectible; trinkets/<id>.png every trinket
@@ -42,6 +44,24 @@ def anm2_frames(path):
     return out
 
 
+def card_frames(path):
+    """{card ID: (x, y, w, h)} from ui_cardspills.anm2's "CardFronts" animation,
+    which the HUD's pocket draws at the frame for the card's ID. The frames it
+    leaves blank are the runes and soul stones, drawn from their pickups."""
+    root = ET.parse(path).getroot()
+    out = {}
+    for anim in root.iter('Animation'):
+        if anim.get('Name') != 'CardFronts':
+            continue
+        for layer in anim.iter('LayerAnimation'):
+            frame = 0
+            for f in layer.iter('Frame'):
+                if f.get('Visible', 'true') == 'true' and frame > 0:
+                    out[frame] = tuple(int(f.get(k)) for k in ('XCrop', 'YCrop', 'Width', 'Height'))
+                frame += int(f.get('Delay', '1'))
+    return out
+
+
 def find(folder, name):
     for f in os.listdir(folder):
         if f.lower() == name.lower():
@@ -51,7 +71,7 @@ def find(folder, name):
 
 def main():
     ap = argparse.ArgumentParser()
-    for k in ('out', 'ui', 'collectibles', 'trinkets', 'data', 'sheets', 'fonts'):
+    for k in ('out', 'ui', 'collectibles', 'trinkets', 'data', 'sheets', 'fonts', 'pickups'):
         ap.add_argument('--' + k, required=True)
     a = ap.parse_args()
     out = a.out
@@ -88,6 +108,15 @@ def main():
         sheet(find(a.ui, png), png)
         for anim, (x, y, w, h) in anm2_frames(find(a.ui, anm)).items():
             regions[prefix + anim] = [png, x, y, w, h]
+
+    # every card's pocket picture by its ID, as the HUD draws it; soul stones
+    # (IDs 81-97) are their pickups, 32 x 32 and eight to a row. Runes have no
+    # picture of their own here: the app uses the game's minimap rune.
+    for cid, (x, y, w, h) in card_frames(find(a.ui, 'ui_cardspills.anm2')).items():
+        regions['card-%d' % cid] = ['ui_cardfronts.png', x, y, w, h]
+    sheet(find(a.pickups, 'pickup_soulstones.png'), 'pickup_soulstones.png')
+    for i in range(17):
+        regions['card-%d' % (81 + i)] = ['pickup_soulstones.png', (i % 8) * 32, (i // 8) * 32, 32, 32]
 
     # fonts (TrueType versions of the game's bitmap fonts), with a full name
     # table: Java and some Android versions refuse a font without names
