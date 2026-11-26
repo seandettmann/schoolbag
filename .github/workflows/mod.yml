@@ -1,0 +1,110 @@
+# Uploads the Schoolbag mod to its Steam Workshop item (3846036075), the job
+# the game's ModUploader.exe used to do on the Windows PC. GameNative then
+# updates it on the Thor like any subscribed mod.
+#
+# - A push to main that changes the mod (mod/schoolbag/ or mod/preview.png)
+#   runs the mod's tests and, if they pass, uploads it. Run it by hand from
+#   the Actions tab (Mod, Run workflow) to upload main as it is.
+# - It signs in to Steam with a saved steamcmd login, never a password: the
+#   secrets STEAM_USERNAME and STEAM_CONFIG_VDF, made on the Mac with
+#   tools/steam_login.sh. Only Valve's own steamcmd sees them, the login is
+#   deleted when the job ends, and the workflow never runs for pull requests.
+# - tools/workshop_vdf.py writes what steamcmd sends: the mod folder, the name
+#   and description from metadata.xml, mod/preview.png, and a change note. It
+#   never sets visibility, so the item stays private until it's switched to
+#   public on its Workshop page.
+name: Mod
+
+on:
+  push:
+    branches: [main]
+    paths: ['mod/schoolbag/**', 'mod/preview.png']
+  workflow_dispatch:
+    inputs:
+      note:
+        description: Change note, if CHANGELOG.md has no "Mod X.Y.Z" notes yet (default the last commit's subject)
+        required: false
+
+permissions:
+  contents: read
+
+# one upload at a time, and never cut one off halfway
+concurrency:
+  group: mod-workshop
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test the mod
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q lua5.3 lua-socket
+          python3 tests/check_workshop.py
+          python3 tests/check_mod.py
+          for t in reminder hud banners bag net; do lua5.3 "tests/check_$t.lua"; done
+
+      - name: What to upload
+        env:
+          NOTE: ${{ inputs.note }}
+        run: |
+          python3 tools/workshop_vdf.py "$RUNNER_TEMP/schoolbag.vdf" \
+            --commit "$(git rev-parse --short HEAD)" --note "${NOTE:-$(git log -1 --format=%s)}"
+
+      - name: Upload to the Workshop
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          set -euo pipefail
+          if [ -z "$STEAM_USERNAME" ] || [ -z "$STEAM_CONFIG_VDF" ]; then
+            echo "::error::The STEAM_USERNAME and STEAM_CONFIG_VDF secrets aren't set. Make them on the Mac with tools/steam_login.sh."
+            exit 1
+          fi
+          relogin="Steam didn't accept the saved login. On the Mac, run tools/steam_login.sh again to save a new one."
+
+          # Valve's steamcmd, with its home (and so the login) in a folder of
+          # this run's that's deleted at the end, even if something fails
+          ROOT=$(mktemp -d "$RUNNER_TEMP/steamcmd.XXXXXX")
+          trap 'rm -rf "$ROOT"' EXIT
+          export HOME="$ROOT/home"
+          mkdir -p "$ROOT/install" "$HOME"
+          curl -fsSL https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+            | tar --no-same-owner -xz -C "$ROOT/install"
+          STEAMCMD="$ROOT/install/steamcmd.sh"
+          # the first run updates steamcmd itself
+          if ! "$STEAMCMD" +quit < /dev/null > "$ROOT/update.log" 2>&1; then
+            sudo apt-get install -y -q lib32gcc-s1 || true
+            "$STEAMCMD" +quit < /dev/null > "$ROOT/update.log" 2>&1 || { cat "$ROOT/update.log"; echo "::error::steamcmd didn't start."; exit 1; }
+          fi
+
+          # the saved login, where steamcmd looks for it on Linux
+          for dir in "$HOME/Steam/config" "$ROOT/install/config"; do
+            mkdir -p "$dir"
+            printf '%s' "$STEAM_CONFIG_VDF" | base64 -d > "$dir/config.vdf"
+          done
+
+          # no input, so a login that wants a password or code fails instead of waiting
+          status=0
+          timeout 8m "$STEAMCMD" +login "$STEAM_USERNAME" +workshop_build_item "$RUNNER_TEMP/schoolbag.vdf" +quit \
+            < /dev/null 2>&1 | tee "$ROOT/upload.log" || status=$?
+          # (steamcmd also prints harmless "Failed to init SDL..." lines, so
+          # only its login messages count here)
+          if grep -qE "Login Failure|\.\.\.FAILED|password:|Steam Guard|Two-factor" "$ROOT/upload.log"; then
+            echo "::error::$relogin"; exit 1
+          fi
+          if [ "$status" -ne 0 ] || grep -q "ERROR!" "$ROOT/upload.log"; then
+            echo "::error::The upload didn't go through (steamcmd exit $status). Its output is above."; exit 1
+          fi
+
+          ID=$(sed -n 's:.*<id>\([0-9]*\)</id>.*:\1:p' mod/schoolbag/metadata.xml)
+          VERSION=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' mod/schoolbag/metadata.xml)
+          if ! grep -q "Success" "$ROOT/upload.log"; then
+            echo "::warning::steamcmd finished without saying \"Success\". Check the item's Change Notes."
+          fi
+          echo "Uploaded Schoolbag mod $VERSION to [Workshop item $ID](https://steamcommunity.com/sharedfiles/filedetails/?id=$ID)." >> "$GITHUB_STEP_SUMMARY"
