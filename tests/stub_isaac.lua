@@ -228,8 +228,15 @@ end
 function player:GetActiveItem(slot) return W.actives[slot] or 0 end
 function player:GetActiveCharge(slot) return slot == 0 and 4 or 2 end
 function player:GetBatteryCharge() return 0 end
-function player:GetCard(slot) return slot == 0 and 1 or 0 end
-function player:GetPill(slot) return slot == 1 and (3 | 2048) or (slot == 2 and 5 or 0) end
+-- W.cards / W.pills replace the default pockets when a test sets them
+function player:GetCard(slot)
+  if W.cards then return W.cards[slot] or 0 end
+  return slot == 0 and 1 or 0
+end
+function player:GetPill(slot)
+  if W.pills then return W.pills[slot] or 0 end
+  return slot == 1 and (3 | 2048) or (slot == 2 and 5 or 0)
+end
 function player:GetPlayerFormCounter(f) return f == 1 and 2 or 0 end
 function player:IsItemQueueEmpty() return not W.queued end
 function player:GetSprite()

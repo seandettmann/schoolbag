@@ -39,15 +39,19 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
-- **Mod 0.2.0:** written and tested against a stand-in for the game's API
-  (see `tests/`). Not yet tested in the real game.
+- **Mod 0.2.1:** tested against a stand-in for the game's API (see
+  `tests/`), and a first round in the real game on the Thor (0.2.0). 0.2.1
+  fixes what that round found: `/watch` hanging on the menus, the offline
+  banner blinking between rooms and sitting under the game's card banner, and
+  the banners' fonts not matching the game's.
 - **App:** not started yet. The design mock-ups are done.
 
 ## Roadmap
 
 **Next**
 - The app, built from the finished mock-ups.
-- A first test of the mod in the real game on the Thor.
+- The rest of the test checklist on the Thor (banners, boss bar, characters,
+  Jacob & Esau, the Bag of Crafting, death).
 
 **Parked** (set aside for now, with the work kept)
 - **Pill tracker.** A "Pills" tag on the Items tab opening a page of the 13
@@ -139,7 +143,9 @@ lua5.3 tests/check_bag.lua       # tracking what goes into the Bag of Crafting
 folder, launch with `--luadebug`, start a run and open
 `http://127.0.0.1:8089/watch` in a browser (on the Thor, on the bottom
 screen). That test page reads the mod twice a second, like the app will, so
-the game's HUD stays hidden, and shows the values worth checking. It also
+the game's HUD stays hidden, and shows the values worth checking. The mod only
+listens during a run, so on the menus the page says "No answer" (and a fresh
+load of it there just fails to connect). It also
 lists any **problems** (parts of the mod that failed) and the game calls that
 didn't answer, and its **Copy state** button copies all of it, with the full
 state, to paste into a chat or an issue. `/state` is the raw data. The game's

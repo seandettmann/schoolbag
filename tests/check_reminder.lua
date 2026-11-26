@@ -88,17 +88,22 @@ check(whole and whole.c.pos.X == 240 and whole.c.pos.Y == 48 and not find(c, "la
 local title = find(c, "font", "Schoolbag is offline")
 local detail = find(c, "font", "Needs --luadebug")
 check(title and detail, "both lines drawn")
-check(title and title.b == "font/teammeatfont20bold.fnt" and detail and detail.b == "font/teammeatex/teammeatex10.fnt",
-  "game fonts: Team Meat 20 bold title, Team Meat Extended 10 detail")
-check(title and title.c.center and title.c.box == 400 and title.c.x == 40 and title.c.y == 35, "title centred on the ink")
-check(detail and detail.c.center and detail.c.box == 168 and detail.c.x == 156 and detail.c.y == 64,
+check(title and title.b == "font/upheaval.fnt" and detail and detail.b == "font/upheavalmini.fnt",
+  "the game's banner fonts: Upheaval on the ink, Upheaval mini on the paper")
+check(title and title.c.center and title.c.box == 400 and title.c.x == 40 and title.c.y == 38, "title centred on the ink")
+check(detail and detail.c.center and detail.c.box == 168 and detail.c.x == 156 and detail.c.y == 70,
   "detail centred on the paper strip")
 c = frames(30 * 60 * 10)
 check(ink(c) == "TextStay:0" and find(c, "font", "Needs --luadebug"), "still up ten minutes later")
 
 W.paused = true
+c = frames(20)
+check(ink(c) == "TextStay:0", "a short pause (a room change): stays up, no blink")
+W.paused = false
+c = frames(1)
+W.paused = true
 c = frames(300)
-check(#c == 0, "hidden while paused")
+check(#c == 0, "hidden while paused for longer (the pause menu)")
 W.paused = false
 c = frames(1)
 check(ink(c) == "TextStay:0", "back as soon as the game resumes")
@@ -127,6 +132,26 @@ c = frames(11)
 check(#c == 0, "card used: steps aside")
 c = frames(4 * 30)
 check(ink(c) ~= nil, "and comes back")
+c = frames(20)
+W.cards = { [0] = 3 }
+c = frames(1)
+check(ink(c) == "TextOut:0", "card picked up: steps aside for the game's pickup banner")
+c = frames(4 * 30 + 9)
+check(ink(c) == "TextStay:0", "and comes back")
+W.pills = { [0] = 7 }
+c = frames(1)
+check(ink(c) == "TextOut:0", "pill picked up: steps aside too")
+c = frames(4 * 30 + 9)
+W.trinkets[0] = 19
+c = frames(1)
+check(ink(c) == "TextOut:0", "trinket picked up: steps aside too")
+c = frames(4 * 30 + 9)
+W.cards, W.pills = { [0] = 0, [1] = 3 }, { [0] = 0, [1] = 7 }
+c = frames(1)
+check(ink(c) == "TextStay:0", "switching between pockets: stays up")
+W.cards, W.pills, W.trinkets[0] = {}, {}, 0
+c = frames(1)
+check(ink(c) == "TextStay:0", "using things up: stays up")
 c = frames(20)
 W.playing = "Trapdoor"
 c = frames(1)

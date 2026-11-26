@@ -23,14 +23,23 @@ device can reach it.
 Every response has `Connection: close` and `Access-Control-Allow-Origin: *`.
 
 **When nothing answers:** the mod can only answer while the game is rendering a
-run. On the title screen and in menus there is no answer at all, and if
-`--luadebug` is missing the server never starts. The app treats "no answer" as
-"not in a run" and, after a while, shows a hint to check the mod and the launch
-option. In the game, the mod says the same thing itself: from a few seconds
-into each run it keeps a banner up in the style of the game's own banners,
+run, so it only listens during one: it starts listening when a run starts or is
+continued and stops when you exit to the menu. On the title screen and in menus
+the connection is refused straight away, and if `--luadebug` is missing the
+server never starts. Give every request a short timeout (about 1.5 seconds) and
+keep at most one waiting at a time: a request can still go unanswered, for
+example on the game-over screen on the way back to the menu. The app treats
+"no answer" (refused or timed out) as "not in a run" and, after a while, shows
+a hint to check the mod and the launch option. In the game, the mod says the
+same thing itself: from a few seconds into each run it keeps a banner up in the
+style of the game's own banners,
 "Schoolbag is offline", with "Needs --luadebug" (or "Port 8089 is busy") on
-the paper strip under it. It uses the game's own banner sprite and fonts and
-steps aside whenever the game shows a banner of its own in the same spot.
+the paper strip under it. It uses the game's own banner sprite and fonts
+(Upheaval on the ink, Upheaval mini on the paper) and steps aside whenever the
+game shows a banner of its own in the same spot: a new floor, an item or
+trinket held overhead, a pill or card used, and a card, pill or trinket picked
+up. Brief pauses (room changes) leave it up; it hides while the game has been
+paused for about 3/4 of a second (the pause menu).
 
 **The game's own HUD:** while `/state` is being read, the mod hides the game's
 HUD on the main screen, since the app shows it on the other screen. It comes
@@ -57,11 +66,12 @@ revisit.
 
 **What the mod draws while the HUD is hidden:** hiding the game's HUD also hides
 the banners it shows for a new floor (with its curse on the paper strip), a
-picked-up item (with its one-line description), a pill and a card, and the
-boss health bar. While the HUD is hidden, the mod draws these itself on the
-main screen with the game's own art, in the same places and with the same
-timing. If the HUD is hidden partway through a banner, the mod's carries on
-from the same frame. When the HUD is showing, the game draws its own and the
+picked-up item or card (with its one-line description), a pill or card used,
+and the boss health bar. While the HUD is hidden, the mod draws these itself
+on the main screen with the game's own art and fonts, in the same places and
+with the same timing. A line too long for the paper strip gets a wider strip.
+If the HUD is hidden partway through a banner, the mod's carries on from the
+same frame. When the HUD is showing, the game draws its own and the
 mod draws nothing.
 
 **`POST /strings`, the game's words:** the game gives mods codes such as
@@ -131,7 +141,7 @@ The mod never sends what the game is hiding from the player:
 ```json
 {
   "protocol": 1,
-  "mod": { "name": "Schoolbag", "version": "0.2.0" },
+  "mod": { "name": "Schoolbag", "version": "0.2.1" },
   "inRun": true,
   "paused": false,
   "humans": 1,
@@ -149,7 +159,7 @@ The mod never sends what the game is hiding from the player:
 
 | Field | Meaning |
 |---|---|
-| `inRun` | `true` while a run is going. |
+| `inRun` | `true` while a run is going. Since the mod only listens during a run, an answer almost always says `true`. |
 | `humans` | How many people are playing (one per controller). More than 1 is co-op, and the mod leaves the game's HUD on. |
 | `strings` | How many of the game's words the app has sent with `POST /strings`. 0 means send them. |
 | `hudHidden` | `true` while the mod is hiding the game's HUD. |

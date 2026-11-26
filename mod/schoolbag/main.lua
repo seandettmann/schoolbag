@@ -14,7 +14,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.2.0"
+local VERSION = "0.2.1"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -1057,6 +1057,17 @@ local function startServer(quiet)
   log("listening on http://" .. HOST .. ":" .. PORT)
 end
 
+-- Only listen during a run. On the menus the game runs no mod code to answer,
+-- so a request would wait forever; with nothing listening, the app and /watch
+-- get a quick "no answer" instead.
+local function stopServer()
+  if server then
+    pcall(function() server:close() end)
+    log("stopped listening until the next run")
+  end
+  server, SchoolbagServer = nil, nil
+end
+
 local MAX_BODY = 4 * 1024 * 1024 -- the app's strings are well under this
 
 local function readRequest(client)
@@ -1182,11 +1193,11 @@ function notes(s) {
   return p.length ? ["", "PROBLEMS (" + p.length + "):"].concat(p.map(function (x) { return "  " + x; }))
     : ["", "problems: none"];
 }
-var last = null, lastAt = "";
+var last = null, lastAt = "", stale = false;
 function report() {
   if (!last) return "Schoolbag /watch: no answer from the mod yet.";
   var m = last.misses || [];
-  return ["Schoolbag /watch report, " + lastAt, ""].concat(lines(last), notes(last),
+  return ["Schoolbag /watch report, " + lastAt + (stale ? " (no answer since then)" : ""), ""].concat(lines(last), notes(last),
     ["", "Game calls that didn't answer (" + m.length + "):"], m.map(function (x) { return "  " + x; }),
     ["", "Full state:", JSON.stringify(last)]).join("\n");
 }
@@ -1209,11 +1220,38 @@ el("copy").onclick = function () {
     fallback();
   }
 };
+// One read at a time, given up after 1.5 seconds, so a game that can't answer
+// shows "No answer" instead of a page that stops moving.
+var waiting = false;
+function noAnswer() {
+  stale = true;
+  el("sum").textContent = "No answer at " + new Date().toLocaleTimeString() +
+    ": the game is on a menu, or the mod isn't running." +
+    (lastAt ? "\nLast answer at " + lastAt + "." : "");
+}
 function tick() {
-  fetch("/state" + (el("keep").checked ? "?hud=keep" : ""), { cache: "no-store" })
+  if (waiting) return;
+  waiting = true;
+  var done = false;
+  var ctl = window.AbortController ? new AbortController() : null;
+  var finish = function () {
+    if (done) return false;
+    done = true;
+    waiting = false;
+    clearTimeout(timer);
+    return true;
+  };
+  var timer = setTimeout(function () {
+    if (finish()) { if (ctl) ctl.abort(); noAnswer(); }
+  }, 1500);
+  var opts = { cache: "no-store" };
+  if (ctl) opts.signal = ctl.signal;
+  fetch("/state" + (el("keep").checked ? "?hud=keep" : ""), opts)
     .then(function (r) { return r.json(); })
     .then(function (s) {
+      if (!finish()) return;
       last = s;
+      stale = false;
       lastAt = new Date().toLocaleTimeString();
       el("sum").textContent = lines(s).concat(notes(s)).join("\n");
       var m = s.misses || [];
@@ -1221,10 +1259,7 @@ function tick() {
       el("miss").textContent = m.join("\n");
       el("raw").textContent = JSON.stringify(s, null, 1);
     })
-    .catch(function () {
-      el("sum").textContent = "No answer at " + new Date().toLocaleTimeString() +
-        ": the game is on a menu, or the mod isn't running.";
-    });
+    .catch(function () { if (finish()) noAnswer(); });
 }
 setInterval(tick, 500);
 tick();
@@ -1363,25 +1398,39 @@ local REMIND_DELAY = 4 * 30 -- game updates to wait before (re)appearing, so the
 local REMIND_Y = 48         -- banner centre, in screen points (where the game puts its own)
 local STREAK_IN, STREAK_OUT = 9, 11 -- frames in the game's TextIn / TextOut animations
 local PAPER_TOP = 12        -- the paper strip's top edge, below the banner centre
-local DETAIL_DY = 4         -- detail text below the strip's top edge (centred on the strip)
+local PAPER_TEXT_W = 134    -- widest detail line that fits on the strip with some paper
+                            -- around it; longer ones get a wider strip
+local PAUSE_HIDE = 45       -- render frames (3/4 s): paused that long means the pause
+                            -- menu or a floor change, so the banners hide. Room changes
+                            -- pause the game more briefly, and the banners stay up.
 local BIND_RETRY = 5 * 30   -- how often to try a busy port again
 local REMIND_TITLE = "Schoolbag is offline"
 local REMIND_DETAIL = { luadebug = "Needs --luadebug", bind = "Port " .. PORT .. " is busy" }
 local INK = { 54 / 255, 47 / 255, 45 / 255 } -- the dark ink the game writes on paper with
 
+-- The game writes its banners in Upheaval: the big size on the ink, the small
+-- one on the paper. Each font comes with how far down to start writing so its
+-- letters sit in the middle (of the ink, or of the paper strip).
+local TITLE_FONTS = { { "font/upheaval.fnt", -10 }, { "font/teammeatfont20bold.fnt", -13 } }
+local DETAIL_FONTS = { { "font/upheavalmini.fnt", 10 }, { "font/teammeatex/teammeatex10.fnt", 4 },
+  { "font/pftempestasevencondensed.fnt", 4 } }
+
 -- phase: nil (off), "wait" (until t0), "in", "stay", "out" (each started at t0)
 local remind = { phase = nil, t0 = 0, resumeAt = nil, art = nil }
 
-local function loadFont(paths)
-  for _, path in ipairs(paths) do
+local pausedFrames = 0 -- render frames the game has been paused for
+local function hiddenByPause() return pausedFrames >= PAUSE_HIDE end
+
+local function loadFont(choices)
+  for _, c in ipairs(choices) do
     local font = try(function()
       local f = Font()
-      f:Load(path)
+      f:Load(c[1])
       if f:IsLoaded() then return f end
     end)
-    if font then return font end
+    if font then return font, c[2] end
   end
-  return nil
+  return nil, 0
 end
 
 local function loadSprite(path)
@@ -1395,15 +1444,41 @@ end
 
 local function reminderArt()
   if remind.art then return remind.art end
-  remind.art = {
-    streak = loadSprite("gfx/ui/ui_streak.anm2"),
-    title = loadFont({ "font/teammeatfont20bold.fnt", "font/upheaval.fnt" }),
-    -- the strip is small, so the detail uses the small Team Meat size to keep
-    -- some paper around the words
-    detail = loadFont({ "font/teammeatex/teammeatex10.fnt", "font/teammeatfont10.fnt",
-      "font/pftempestasevencondensed.fnt" }),
-  }
-  return remind.art
+  local art = { streak = loadSprite("gfx/ui/ui_streak.anm2") }
+  art.title, art.titleDY = loadFont(TITLE_FONTS)
+  art.detail, art.detailDY = loadFont(DETAIL_FONTS)
+  remind.art = art
+  return art
+end
+
+-- The ink streak (layer 0) and its paper strip (layer 1) at x, y, with the
+-- title and the detail line on them. A detail line too long for the strip
+-- gets a strip stretched to fit, so the words never run off the paper.
+local function drawStreak(art, anim, frame, x, y, title, detail, words)
+  local zero, pos = Vector(0, 0), Vector(x, y)
+  local spr = art.streak
+  spr:SetFrame(anim, frame)
+  local w = detail and (try(function() return art.detail:GetStringWidth(detail) end) or 0) or 0
+  if not detail then
+    -- no detail: the ink alone, as the game does for a pill or a card
+    if not pcall(spr.RenderLayer, spr, 0, pos, zero, zero) then spr:Render(pos, zero, zero) end
+  elseif w > PAPER_TEXT_W and pcall(spr.RenderLayer, spr, 0, pos, zero, zero) then
+    local ok = pcall(function()
+      spr.Scale = Vector((w + 16) / (PAPER_TEXT_W + 16), 1)
+      spr:RenderLayer(1, pos, zero, zero)
+    end)
+    pcall(function() spr.Scale = Vector(1, 1) end)
+    if not ok then spr:Render(pos, zero, zero) end
+  else
+    spr:Render(pos, zero, zero) -- the ink and its paper strip together
+  end
+  if words then
+    art.title:DrawString(title, x - 200, y + art.titleDY, KColor(1, 1, 1, 1), 400, true)
+    if detail then
+      local box = math.max(168, math.ceil(w) + 16)
+      art.detail:DrawString(detail, x - box / 2, y + PAPER_TOP + art.detailDY, KColor(INK[1], INK[2], INK[3], 1), box, true)
+    end
+  end
 end
 
 local function now() return game:GetFrameCount() end
@@ -1460,7 +1535,7 @@ local function drawReminder()
   advanceReminder()
   local phase = remind.phase
   if phase == nil or phase == "wait" then return end
-  if game:IsPaused() or run.ended then return end
+  if hiddenByPause() or run.ended then return end
   local k = now() - remind.t0
   local anim, frame, words
   if phase == "in" then
@@ -1483,13 +1558,7 @@ local function drawReminder()
     end
     return
   end
-  local zero = Vector(0, 0)
-  art.streak:SetFrame(anim, frame)
-  art.streak:Render(Vector(x, y), zero, zero) -- the ink and its paper strip fly in together
-  if words then
-    art.title:DrawString(REMIND_TITLE, x - 200, y - 13, KColor(1, 1, 1, 1), 400, true)
-    art.detail:DrawString(detail, x - 84, y + PAPER_TOP + DETAIL_DY, KColor(INK[1], INK[2], INK[3], 1), 168, true)
-  end
+  drawStreak(art, anim, frame, x, y, REMIND_TITLE, detail, words) -- ink and paper fly in together
 end
 
 -- A busy port may come free during the run: try again every few seconds.
@@ -1508,7 +1577,8 @@ end
 -- The game's banners and boss bar, while its HUD is hidden
 ------------------------------------------------------------------------------
 -- Hiding the game's HUD also hides the banners it shows for a new floor (with
--- its curse), a picked-up item, a pill or a card, and the boss health bar.
+-- its curse), a picked-up item or card, a pill or card used, and the boss
+-- health bar.
 -- While Schoolbag has the HUD hidden, the mod draws them itself with the
 -- game's own art, in the same place and with the same timing. Each banner is
 -- followed from the moment the game would have started it, so if the HUD is
@@ -1585,10 +1655,52 @@ local function watchPickups()
   end
 end
 
+-- Picking up a card, pill or trinket: the game shows its name in the banner
+-- spot too. Counted per player, so switching between pockets (the drop
+-- button) isn't mistaken for a pickup.
+local pockets = {} -- per player: how many of each card, pill and trinket they hold
+local function pocketCounts(p)
+  local counts = {}
+  local function add(key, id)
+    if id and id > 0 then counts[key .. id] = (counts[key .. id] or 0) + 1 end
+  end
+  for slot = 0, 3 do
+    add("card", try(function() return p:GetCard(slot) end))
+    add("pill", try(function() return p:GetPill(slot) end))
+  end
+  for slot = 0, 1 do add("trinket", try(function() return p:GetTrinket(slot) end)) end
+  return counts
+end
+
+local function watchPockets()
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    if p then
+      local counts, before = pocketCounts(p), pockets[i]
+      if before then -- the first look at a player is what they started with
+        for key, n in pairs(counts) do
+          if n > (before[key] or 0) then
+            reminderStepAside()
+            local card = tonumber(key:match("^card(%d+)$"))
+            if card then
+              local cfg = try(function() return Isaac.GetItemConfig():GetCard(card) end)
+              if cfg then
+                showBanner(readable(try(function() return cfg.Name end)), readable(try(function() return cfg.Description end)))
+              end
+            end
+            break
+          end
+        end
+      end
+      pockets[i] = counts
+    end
+  end
+end
+
 local function drawBanner()
   local k = now() - banner.t0
   if k < 0 or k >= BANNER_FRAMES then banner = nil return end
-  if game:IsPaused() then return end
+  if hiddenByPause() then return end
   local art = reminderArt()
   local x, y = Isaac.GetScreenWidth() / 2, REMIND_Y
   local words = k >= WORDS_FROM and k <= WORDS_TO
@@ -1600,19 +1712,7 @@ local function drawBanner()
     end
     return
   end
-  local zero = Vector(0, 0)
-  art.streak:SetFrame("Text", k)
-  if banner.detail then
-    art.streak:Render(Vector(x, y), zero, zero) -- the ink and its paper strip
-  elseif not pcall(art.streak.RenderLayer, art.streak, 0, Vector(x, y), zero, zero) then
-    art.streak:Render(Vector(x, y), zero, zero)
-  end
-  if words then
-    art.title:DrawString(banner.title, x - 200, y - 13, KColor(1, 1, 1, 1), 400, true)
-    if banner.detail then
-      art.detail:DrawString(banner.detail, x - 84, y + PAPER_TOP + DETAIL_DY, KColor(INK[1], INK[2], INK[3], 1), 168, true)
-    end
-  end
+  drawStreak(art, "Text", k, x, y, banner.title, banner.detail, words)
 end
 
 -- The boss bar: every boss in the room added together, as the game does.
@@ -1635,7 +1735,7 @@ local function scanBosses()
 end
 
 local function drawBossBar()
-  if boss.max <= 0 or boss.hp <= 0 or game:IsPaused() then return end
+  if boss.max <= 0 or boss.hp <= 0 or hiddenByPause() then return end
   if bossBar == nil then bossBar = loadSprite("gfx/ui/schoolbag_bossbar.anm2") or false end
   if not bossBar then return end
   local pos = Vector(Isaac.GetScreenWidth() / 2, Isaac.GetScreenHeight() - BOSSBAR_FROM_BOTTOM)
@@ -1668,6 +1768,7 @@ mod:AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function(_, isContinued)
   resetRun()
   if isContinued then loadRun() end
   run.inRun = true
+  pockets = {}
   if serverProblem == "bind" then serverProblem = nil end -- the port may be free now
   startServer()
   remind.phase, remind.resumeAt = nil, nil
@@ -1681,6 +1782,7 @@ mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function(_, shouldSave)
   run.inRun = false
   remind.phase, remind.resumeAt = nil, nil
   if SchoolbagHudHidden then setGameHud(true) end
+  stopServer()
 end)
 
 mod:AddCallback(ModCallbacks.MC_POST_GAME_END, function(_, isGameOver)
@@ -1735,6 +1837,8 @@ mod:AddCallback(ModCallbacks.MC_POST_UPDATE, function()
     retryBind()
     local ok, err = pcall(watchPickups)
     if not ok then logOnce("couldn't watch pickups: " .. shortErr(err)) end
+    ok, err = pcall(watchPockets)
+    if not ok then logOnce("couldn't watch pockets: " .. shortErr(err)) end
     ok, err = pcall(watchBag)
     if not ok then logOnce("couldn't watch the Bag of Crafting: " .. shortErr(err)) end
     if run.bagsDirty then saveRun() end -- the game could be closed before the next floor
@@ -1762,6 +1866,11 @@ end, K.ENTITY_PLAYER)
 -- Served from the render callback, which keeps running while the game is
 -- paused (the update callback doesn't).
 mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
+  if try(function() return game:IsPaused() end) then
+    pausedFrames = pausedFrames + 1
+  else
+    pausedFrames = 0
+  end
   if not run.inRun and not sawLifecycle then
     -- the mod was loaded mid-run (e.g. `luamod`), so pick the run up
     if game:GetFrameCount() > 0 then
@@ -1784,4 +1893,6 @@ mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
   end
 end)
 
-startServer()
+-- The server starts with each run (MC_POST_GAME_STARTED, or the render
+-- callback above after a mid-run reload), not here: the game loads mods at
+-- the title screen, where nothing would answer.

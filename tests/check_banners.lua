@@ -28,14 +28,18 @@ Sprite = function()
   function spr:IsLoaded() return true end
   function spr:SetFrame(anim, f) self.anim, self.frame = anim, f end
   function spr:Render(pos) record("sprite", self.path, self.anim .. ":" .. self.frame, pos) end
-  function spr:RenderLayer(layer, pos) record("layer", self.path, self.anim .. ":" .. self.frame, layer) end
+  function spr:RenderLayer(layer, pos)
+    record("layer", self.path, self.anim .. ":" .. self.frame, layer)
+    if self.Scale and self.Scale.X ~= 1 then record("scale", self.path, self.Scale.X, layer) end
+  end
   return spr
 end
 Font = function()
   local f = {}
   function f:Load(path) self.path = path end
   function f:IsLoaded() return true end
-  function f:DrawString(s, x, y) record("font", s, self.path, { x = x, y = y }) end
+  function f:DrawString(s, x, y, col, box) record("font", s, self.path, { x = x, y = y, box = box }) end
+  function f:GetStringWidth(s) return #s * 7 end -- about Upheaval mini's
   return f
 end
 -- items held overhead, pills, cards and bosses
@@ -140,6 +144,14 @@ check(words(c) == "Basement II / Curse of the Blind" and (streak(c) or ""):match
 newFloor(3, 0, 2)
 c = run(20)
 check(words(c):match("^Caves XL / Curse of the Labyrinth"), "Curse of the Labyrinth: Caves XL")
+local wide = find(c, "scale")
+local line = find(c, "font", "Curse of the Labyrinth")
+check(find(c, "layer") and wide and wide.c == 1 and math.abs(wide.b - (154 + 16) / 150) < 0.001
+  and line and line.c.box == 170,
+  "a line too long for the paper strip gets a wider strip, and stays on it")
+newFloor(2, 0, 64)
+c = run(20)
+check(not find(c, "scale") and (streak(c) or ""):match("^sprite Text:"), "a line that fits: the strip as it is")
 newFloor(1, 4)
 c = run(20)
 check(words(c) == "Downpour I", "the Repentance path: Downpour I")
@@ -192,9 +204,24 @@ fire(ModCallbacks.MC_USE_CARD, 1, P, 0)
 c = run(10)
 check(words(c) == "The Fool", "card used: its name")
 local was = tonumber(streak(c):match("%d+$"))
+W.cards = { [0] = 3 } -- picked up a card
+c = run(10)
+check(words(c) == "Card" and streak(c), "card picked up: its name (the game shows one then too)")
+W.cards = { [0] = 3, [1] = 1 }
+run(80)
+W.cards = { [0] = 1, [1] = 3 } -- the drop button swaps them
+c = run(10)
+check(streak(c) == nil, "switching between pockets isn't a pickup")
+W.cards = nil
+run(80)
+fire(ModCallbacks.MC_USE_CARD, 1, P, 0)
+c = run(10)
+was = tonumber(streak(c):match("%d+$"))
 W.paused = true
-c = frames(30)
-check(streak(c) == nil, "hidden while paused")
+c = frames(10)
+check(streak(c) == "layer Text:" .. was, "a short pause (a room change): stays up, holding still")
+c = frames(40)
+check(streak(c) == nil, "hidden once paused for longer (the pause menu)")
 W.paused = false
 c = frames(1)
 check(streak(c) == "layer Text:" .. (was + 1), "and carries on where it was")

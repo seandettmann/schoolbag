@@ -30,6 +30,18 @@ def step(cmd, settle=0.45):
     time.sleep(settle)  # let a few inventory scans run
 
 
+def refused():
+    """True if nothing is listening: the request fails at once instead of waiting."""
+    t = time.time()
+    try:
+        urllib.request.urlopen(BASE + "/state", timeout=3)
+        return False
+    except urllib.error.URLError as e:
+        return isinstance(e.reason, ConnectionRefusedError) and time.time() - t < 1
+    except Exception:
+        return False
+
+
 def get(path):
     try:
         with urllib.request.urlopen(BASE + path, timeout=3) as r:
@@ -52,15 +64,16 @@ lua = subprocess.Popen(["lua5.3", "tests/run_mod.lua"], stderr=subprocess.PIPE, 
 try:
     time.sleep(0.5)
     print("before a run")
+    check(refused(), "nothing listening on the title screen, so no answer comes at once")
+
+    print("normal run")
+    step("start")
     s, h = state()
     check(s["protocol"] == 1 and s["mod"]["name"] == "Schoolbag", "protocol and mod name")
-    check(s["inRun"] is False and "players" not in s, "no run data before a run starts")
     check(h.get("Access-Control-Allow-Origin") == "*", "CORS header")
     check(get("/health")[0] == 200 and get("/health")[2] == "ok", "/health answers ok")
     check(get("/nope")[0] == 404, "unknown path is 404")
-
-    print("normal run")
-    step("start"); step("add4"); step("add1"); step("normal")
+    step("add4"); step("add1"); step("normal")
     s, _ = state()
     p = s["players"][0]
     order = [it["id"] for it in p["items"]]
@@ -111,8 +124,7 @@ try:
 
     print("exit and continue")
     step("exit")
-    s, _ = state()
-    check(s["inRun"] is False, "not in a run after exiting")
+    check(refused(), "nothing listening after exiting to the menu")
     step("continue")
     s, _ = state()
     order2 = [it["id"] for it in s["players"][0]["items"]]
@@ -186,6 +198,10 @@ try:
           "/watch is an HTML page that reads /state")
     check("Copy state" in body and "navigator.clipboard" in body, "/watch has a Copy state button")
     check('"mod " + (s.mod ? s.mod.version' in body, "/watch shows the mod's version")
+    check("AbortController" in body and "}, 1500);" in body and "if (waiting) return;" in body,
+          "/watch gives up on a read after 1.5 seconds and never stacks reads")
+    check("Last answer at" in body and "no answer since then" in body,
+          "/watch says when it last heard from the mod, also in the copied report")
 
     print("problems and unanswered game calls, for testing on the device")
     s, _ = state()

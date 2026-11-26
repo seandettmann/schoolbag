@@ -88,7 +88,7 @@ function S.fixfloor() W.breakFloor = false end
 function S.mirror() W.mirror = true end
 function S.unmirror() W.mirror = false end
 
-local stop = socket.gettime() + 60
+local stop = socket.gettime() + 120
 while socket.gettime() < stop do
   if started then -- frame count stays 0 until a run starts, like the title screen
     W.frame = W.frame + 1
