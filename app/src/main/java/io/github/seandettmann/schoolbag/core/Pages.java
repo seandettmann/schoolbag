@@ -79,8 +79,7 @@ final class Pages {
         if (main) {
             Object[][] rows = {
                     {"Hide the game’s HUD", ui.hideHud, (Runnable) () -> ui.hideHud = !ui.hideHud},
-                    {"Dim when nothing changes", ui.dim, (Runnable) () -> ui.dim = !ui.dim},
-                    {"Room tab on walk-in", ui.roomOnWalkIn, (Runnable) () -> ui.roomOnWalkIn = !ui.roomOnWalkIn}};
+                    {"Dim when nothing changes", ui.dim, (Runnable) () -> ui.dim = !ui.dim}};
             for (Object[] r : rows) {
                 h.text(Face.TITLE, 54, 54, (String) r[0], x, y + 19, Hud.INK);
                 p.sprite((Boolean) r[1] ? "check_on" : "check_off", x + width - 57, y + (92 - 51) / 2f, 3, 1f);

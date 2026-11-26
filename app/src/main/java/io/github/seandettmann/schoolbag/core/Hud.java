@@ -7,7 +7,8 @@ import java.util.Locale;
 /**
  * Draws the bottom screen from the mod's state: the header (actives, hearts,
  * and one line of floor or mode, curses and clock), the pickups scrap, the
- * stats, the three tabs and their pages, and the waiting and settings pages.
+ * stats, the two tabs (Map and Items) and their pages, and the waiting and
+ * settings pages.
  * Positions start from the approved mock-ups (1240 x 1080 points); since the
  * Thor tests the header is one line, the tabs sit beside the hearts and the
  * pages are taller.
@@ -57,7 +58,6 @@ public final class Hud {
         p.translate(MX, MY);
         switch (ui.tab) {
             case "map": TabMap.draw(this, s, player); break;
-            case "room": TabRoom.draw(this, s); break;
             default: TabItems.draw(this, s, player);
         }
         p.restore();
@@ -137,7 +137,7 @@ public final class Hud {
     }
 
     /**
-     * The card at the bottom of the Items and Room tabs: the item's picture, name
+     * The card at the bottom of the Items tab: the item's picture, name
      * and pickup line, and the first of the game's info lines. Tapping it opens
      * (or closes) the item's full description.
      */
@@ -437,16 +437,15 @@ public final class Hud {
     // ---- tabs ----
 
     /**
-     * The three tabs, beside the hearts. Each is the game's paper scrap with a
-     * plain band out of its middle (keep the first columns, carry on from a
-     * later one), so all three fit between the hearts and the page's edge.
+     * The two tabs, beside the hearts. Each is the game's paper scrap widened
+     * to fill the space up to the page's edge: its first columns, then the
+     * art again from an earlier column (a plain band of it drawn twice).
      */
     private void tabs() {
-        // key, label, art, tilt, label nudge, art height, columns kept, carry on from
+        // key, label, art, tilt, label nudge, art height, first columns, then from (141 game pixels wide)
         Object[][] t = {
-                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 68, 90},
-                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 57, 100},
-                {"room", "Room", "tab_room", -0.7f, 4f, 122f, 59, 100}};
+                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 93, 67},
+                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 62, 57}};
         float x = TABS_X;
         for (Object[] tab : t) {
             final String key = (String) tab[0];
@@ -462,10 +461,10 @@ public final class Hud {
             if (!active) p.brightness(0.55f);
             p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
             p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
-            centered(Face.SMALL, 70, 70, (String) tab[1], x, y + (h - 70) / 2f + dy, w, INK);
+            centered(Face.SMALL, 75, 75, (String) tab[1], x, y + (h - 75) / 2f + dy, w, INK);
             p.restore();
             ui.hit(x, y, w, h, () -> ui.tab = key);
-            x += w + 10;
+            x += w + 12;
         }
     }
 }

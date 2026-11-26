@@ -26,7 +26,6 @@ public final class MainActivity extends Activity {
         view.ui.appVersion = BuildConfig.VERSION_NAME;
         view.ui.hideHud = prefs.getBoolean("hideHud", true);
         view.ui.dim = prefs.getBoolean("dim", true);
-        view.ui.roomOnWalkIn = prefs.getBoolean("roomOnWalkIn", true);
         view.ui.language = prefs.getString("language", "auto");
         view.words = App.words(getAssets(), view.ui.language);
         view.onChange = this::settingsChanged;
@@ -38,7 +37,6 @@ public final class MainActivity extends Activity {
         prefs.edit()
                 .putBoolean("hideHud", view.ui.hideHud)
                 .putBoolean("dim", view.ui.dim)
-                .putBoolean("roomOnWalkIn", view.ui.roomOnWalkIn)
                 .putString("language", view.ui.language)
                 .apply();
         if (poller != null) poller.keepHud = !view.ui.hideHud;

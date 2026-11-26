@@ -35,8 +35,6 @@ final class HudView extends View implements Poller.Listener {
     private volatile String signature = "";
     private volatile long lastChange = System.currentTimeMillis();
     private float scale = 1, ox, oy;
-    private int lastRoom = -1;
-    private boolean lastRoomItems = false;
     private String lastSeed = null;
     private int[] shift = SHIFT[0];
 
@@ -64,23 +62,8 @@ final class HudView extends View implements Poller.Listener {
         if (seed != null && (state == null || !state.get("inRun").bool() || !seed.equals(lastSeed))) {
             ui.tab = "map";
             ui.detail = false;
-            ui.roomDetail = false;
         }
         if (seed != null) lastSeed = seed;
-        // following the room (if that's switched on): the Room tab in a room with
-        // items (or when items turn up), the Map tab again on leaving it
-        int room = s.get("room").get("index").integer(-1);
-        boolean items = s.get("room").get("pedestals").size() > 0;
-        if (ui.roomOnWalkIn && state != null && s.get("inRun").bool()) {
-            if (room != lastRoom) {
-                if (items) ui.tab = "room";
-                else if (lastRoomItems) ui.tab = "map";
-            } else if (items && !lastRoomItems) {
-                ui.tab = "room";
-            }
-        }
-        lastRoom = room;
-        lastRoomItems = items;
         state = s;
         lastAnswer = now;
         ui.everAnswered = true;
@@ -145,5 +128,5 @@ final class HudView extends View implements Poller.Listener {
 
     @Override public boolean performClick() { return super.performClick(); }
 
-    String settingsKey() { return ui.hideHud + "," + ui.dim + "," + ui.roomOnWalkIn + "," + ui.language; }
+    String settingsKey() { return ui.hideHud + "," + ui.dim + "," + ui.language; }
 }
