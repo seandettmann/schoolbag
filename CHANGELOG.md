@@ -16,7 +16,8 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   with a pencil line under its label, and the others are dimmed.
 - The strip under the map is two small cards side by side, where the game's
   HUD has them: your trinkets on the left, one a line, and your pocket on
-  the right (with what's next in it, in grey).
+  the right (with what's next in it, in grey). One trinket is drawn at full
+  size, like the pocket; two stay a size smaller to fit the strip.
 - On the Items and Room tabs, the card shows the item bigger, with just its
   name and pickup line. Tap it for the full description, as before.
 - Between floors the Map tab keeps showing the map, instead of a loading

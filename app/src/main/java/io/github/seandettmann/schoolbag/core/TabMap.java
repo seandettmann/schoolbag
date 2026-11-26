@@ -205,7 +205,23 @@ final class TabMap {
         List<Json.J> trinkets = player.get("trinkets").items();
         if (trinkets.isEmpty()) {
             h.text(Face.SMALL, 44, 48, "No trinkets", STRIP_X0, cy - 24, Hud.NUMGREY);
+        } else if (trinkets.size() == 1) {
+            // one trinket: at 3x, the size of the pocket's picture, its name beside it
+            Json.J t = trinkets.get(0);
+            String name = w.text(t.get("name").str()) + (t.get("golden").bool() ? " (gold)" : "");
+            int id = t.get("id").integer();
+            int[] b = p.pictureBounds("trinkets", id);
+            float pw = b == null ? 96 : Math.min(96, b[2] * 3), ph = b == null ? 96 : Math.min(96, b[3] * 3);
+            h.item("trinkets", id, STRIP_X0, cy - ph / 2f, pw, ph, 3, 1f, false);
+            float tx = STRIP_X0 + pw + 16, tw = STRIP_SPLIT - 16 - tx;
+            List<String> lines = h.wrap(Face.SMALL, 40, name, tw); // a long name takes two lines
+            int n = Math.min(lines.size(), 2);
+            for (int i = 0; i < n; i++) {
+                String line = i == 1 && lines.size() > 2 ? h.fit(Face.SMALL, 40, lines.get(1) + " " + lines.get(2), tw) : lines.get(i);
+                h.text(Face.SMALL, 40, 48, line, tx, cy - n * 24 + i * 48, Hud.INK);
+            }
         } else {
+            // two: at 2x, a line each (two at 3x don't fit the strip's height)
             int n = Math.min(trinkets.size(), 2);
             float rowH = 68, y = cy - n * rowH / 2f;
             for (int i = 0; i < n; i++) {
