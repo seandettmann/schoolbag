@@ -12,12 +12,15 @@ final class TabRoom {
         Words w = h.words();
         Hud.page(p, "paper_blank", Hud.EXTRA, 0);
         Json.J room = s.get("room");
+        // the Room tab's own pencil sketches, in three corners
+        p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
+        p.sprite("wm_face", 60, 500, 2, 0.14f);
+        p.sprite("doodle_030", 780, 500, 1, 0.13f);
         if (TabMap.dead(s)) {
             // the run is over: the death picture, and the strip left blank
-            TabMap.ghost(h, player, TabMap.DOWN_SHORT);
+            TabMap.ghost(h, player);
             return;
         }
-        p.sprite("wm_mushroom", 800, 40, 2, 0.14f);
         int type = room.get("type").integer();
         String typeName = name(type);
         if (typeName == null) {

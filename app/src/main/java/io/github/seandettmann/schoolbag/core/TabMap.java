@@ -49,10 +49,11 @@ final class TabMap {
     static final float MAP_CX = 475, MAP_CY = 268 + GROW * 1.5f, MAP_W = 780, MAP_H = 432 + GROW * 3;
     // the biggest zoom for the rooms (9 x 8 game pixels a cell): small floors fill the sheet
     static final int MAP_ZOOM = 14;
-    // how far the sheet's centre moved down since the first layout, for the death picture
+    // how far the sheet's centre moved down since the first layout, for the hidden-map picture
     static final float DOWN = (GROW - 22) * 1.5f;
-    // the same for the Items and Room tabs' shorter sheets
-    static final float DOWN_SHORT = DOWN - (GROW - Hud.EXTRA) * 1.5f;
+    // the death picture's top: the ghost and its line centred in the Items and Room tabs'
+    // sheets, and at the same spot on the Map's, so nothing moves when you switch tabs
+    static final float GHOST_TOP = 119;
 
     static void page(Painter p) {
         Hud.page(p, "paper_blank", GROW, GROW - Hud.EXTRA);
@@ -65,7 +66,7 @@ final class TabMap {
         float[] box = null;
         // between floors the map stays as it was until the next floor's arrives
         if (dead(s)) {
-            ghost(h, player, DOWN);
+            ghost(h, player);
         } else if (map.get("hidden").bool()) {
             p.sprite("map_question", 336, 36 + DOWN, 9, 1f);
             String why = map.get("hiddenReason").str().equals("lost")
@@ -77,9 +78,12 @@ final class TabMap {
         } else {
             box = rooms(h, map);
         }
+        // the Map's own pencil sketches, one in each corner, each left out when the map needs its space
         if (box == null || !overlaps(box, 790, 44, 102, 58)) p.sprite("wm_spider", 790, 44, 2, 0.14f);
+        if (box == null || !overlaps(box, 60, 36, 57, 90)) p.sprite("doodle_026", 60, 36, 1, 0.13f);
         float dy = SHEET_BOTTOM - 162;
         if (box == null || !overlaps(box, 48, dy, 130, 85)) p.sprite("doodle_038", 48, dy, 1, 0.13f);
+        if (box == null || !overlaps(box, 800, dy + 8, 95, 74)) p.sprite("doodle_045", 800, dy + 8, 1, 0.13f);
         if (!dead(s)) strip(h, player); // after a death the strip is left blank
     }
 
@@ -164,19 +168,18 @@ final class TabMap {
 
     /**
      * The death picture, on every tab's sheet while the game's death screen is
-     * up: the ghost bobbing, and who died. `down` moves it to the middle of the
-     * tab's sheet (DOWN on the Map's, DOWN_SHORT on the others').
+     * up, at the same spot on each: the ghost bobbing, and who died.
      */
-    static void ghost(Hud h, Json.J player, float down) {
+    static void ghost(Hud h, Json.J player) {
         Painter p = h.p();
         double t = (h.now() % 2400) / 2400.0;
         float bob = (float) (-12 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t)));
         boolean a = (h.now() / 350) % 2 == 0;
         h.ui().wake(h.now() + 66); // the ghost bobs
-        p.sprite(a ? "ghost_a" : "ghost_b", 391, 64 + down + bob, 3, 1f);
+        p.sprite(a ? "ghost_a" : "ghost_b", 391, GHOST_TOP + bob, 3, 1f);
         String who = h.words().text(player.get("name").str());
         if (who.isEmpty()) who = "Isaac";
-        h.centered(Face.TITLE, 64, 64, who + " died...", 0, 368 + down, 960, Hud.INK);
+        h.centered(Face.TITLE, 64, 64, who + " died...", 0, GHOST_TOP + 304, 960, Hud.INK);
     }
 
     // The strip under the map, between its torn edges, and where its two halves meet.

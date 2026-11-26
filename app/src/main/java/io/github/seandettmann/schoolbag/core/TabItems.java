@@ -43,11 +43,16 @@ final class TabItems {
         boolean dead = TabMap.dead(s);
         boolean detail = ui.detail && selIndex >= 0 && !dead;
 
-        if (!detail && !dead) p.sprite("wm_hanger", 772, 20, 2, 0.14f);
+        // the Items tab's own pencil sketches: under the grid's corners, but not under a description
+        if (!detail) {
+            p.sprite("wm_hanger", 772, 20, 2, 0.14f);
+            p.sprite("doodle_028", 40, 490, 1, 0.13f);
+            p.sprite("doodle_017", 812, 500, 1, 0.13f);
+        }
         p.sprite("wm_bible", 790, 660 + Hud.EXTRA * 3, 2, 0.14f);
 
         if (dead) {
-            TabMap.ghost(h, player, TabMap.DOWN_SHORT);
+            TabMap.ghost(h, player);
         } else if (detail) {
             h.itemDetail(cells.get(selIndex).id);
         } else if (cells.size() <= 21) {
