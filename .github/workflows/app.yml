@@ -188,16 +188,18 @@ jobs:
             old=$1 version=$2 latest=$3
             if ! exists "$old"; then echo "$old is gone already"; return; fi
             if ! exists "v$version"; then
-              sha=$(gh api "repos/$R/git/ref/tags/$old" -q .object.sha)
-              if [ "$(gh api "repos/$R/git/ref/tags/$old" -q .object.type)" = tag ]; then
-                sha=$(gh api "repos/$R/git/tags/$sha" -q .object.sha)
+              # the tag v$version is pushed beforehand, on the build's commit:
+              # this token can't make a tag on a commit whose workflow files
+              # differ from today's
+              if ! gh api "repos/$R/git/ref/tags/v$version" > /dev/null 2>&1; then
+                echo "::error::Push the tag v$version (on $old's commit) first."; exit 1
               fi
               rm -rf dl && mkdir dl
               gh release download "$old" --dir dl --pattern '*.apk'
               mv dl/*.apk "dl/schoolbag-$version.apk"
               awk -v v="## $version" '$0 == v { on = 1; next } /^## / && on { exit } on' CHANGELOG.md | sed '/./,$!d' > notes.md
               if [ ! -s notes.md ]; then echo "::error::CHANGELOG.md has no section for $version"; exit 1; fi
-              gh release create "v$version" "dl/schoolbag-$version.apk" --target "$sha" \
+              gh release create "v$version" "dl/schoolbag-$version.apk" --verify-tag \
                 --title "Schoolbag ${version%.0}" --notes-file notes.md --latest="$latest"
             fi
             gh release delete "$old" --yes --cleanup-tag
