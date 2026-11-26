@@ -207,8 +207,6 @@ tools/artbundle/        builds the app's art bundle from the game's extracted fi
 tools/draw_preview.py   draws the Workshop image, mod/preview.png
 tools/draw_icon.py      draws the app icon's layers into app/icon/
 tools/mock_server.py    a fake mod with scenarios, for building the app without the game
-tools/workshop_vdf.py   writes what the Mod workflow sends to the Workshop
-tools/steam_login.sh    saves the Steam login the Mod workflow uploads with (run on a Mac)
 tests/                  runs the real mod against a stubbed game API, and checks the fake
 ```
 
@@ -222,7 +220,6 @@ Add `--host 0.0.0.0` to reach it from another device on your Wi-Fi.
 ```
 python3 tests/check_mod.py    # the real mod, stubbed game, real HTTP
 python3 tests/check_mock.py   # every fake-mod scenario against the protocol
-python3 tests/check_workshop.py  # what the Mod workflow sends to the Workshop
 lua5.3 tests/check_reminder.lua  # the "Schoolbag is offline" banner
 lua5.3 tests/check_hud.lua       # hiding the game's HUD while the app reads
 lua5.3 tests/check_banners.lua   # the banners and boss bar drawn in the HUD's place
