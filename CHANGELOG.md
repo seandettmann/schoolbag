@@ -3,6 +3,16 @@
 Each version's notes become its GitHub release's notes. From 0.3 on, the app
 and the mod share the version's middle number: app 0.3.x works with mod 0.3.x.
 
+## 0.3.0
+
+Needs the Schoolbag mod 0.3.0 (Workshop).
+
+**App**
+- The Map, Items and Room tabs have room round their labels: the labels are
+  a size smaller and the scraps a little wider.
+- On a Curse of the Lost floor, "the map returns next floor" wraps onto two
+  lines instead of running off the page.
+
 ## 0.2.0
 
 Needs the Schoolbag mod 0.3.0 (Workshop).

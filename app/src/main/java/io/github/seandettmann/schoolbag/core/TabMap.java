@@ -78,7 +78,10 @@ final class TabMap {
             p.sprite("map_question", 336, 36 + DOWN, 9, 1f);
             String why = map.get("hiddenReason").str().equals("lost")
                     ? "Curse of the Lost: the map returns next floor" : "The map is hidden for now";
-            h.centered(Face.SMALL, Hud.BODY, Hud.BODY, why, 64, 352 + DOWN, 832, Hud.INK);
+            // wrapped: at today's text size the Curse of the Lost line is wider than the page
+            List<String> lines = h.wrap(Face.SMALL, Hud.BODY, why, 740);
+            for (int i = 0; i < lines.size() && i < 2; i++)
+                h.centered(Face.SMALL, Hud.BODY, Hud.BODY, lines.get(i), 64, 352 + DOWN + i * 64, 832, Hud.INK);
         } else {
             box = rooms(h, map);
         }

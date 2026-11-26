@@ -20,7 +20,12 @@ public final class Hud {
     // page is than its art (the room the one-line header gave back)
     static final int MX = 272, MY = 190, EXTRA = 18;
     // the tabs: beside the hearts, under the header's line
-    static final float TABS_X = 626, TABS_Y = 84;
+    static final float TABS_X = 620, TABS_Y = 84;
+    // the tab labels' size and the gap between tabs; each scrap keeps TAB_WIDEN
+    // more columns of its art's middle (at 2x), so the words have room inside
+    // the torn edges
+    static final float TAB_TEXT = 64, TAB_GAP = 6;
+    static final int TAB_WIDEN = 6;
     // text sizes, a step up from the mock-ups after the first look on the Thor
     static final float LINE = 54;      // the header's line
     static final float NAME = 72;      // an item's name on its card
@@ -494,7 +499,7 @@ public final class Hud {
             String art = (String) tab[2];
             int[] size = p.size(art);
             if (size == null) continue;
-            int keep = (Integer) tab[6], from = (Integer) tab[7];
+            int keep = (Integer) tab[6] + TAB_WIDEN, from = (Integer) tab[7];
             float w = (keep + size[0] - from) * 2, h = (Float) tab[5], dy = (Float) tab[4];
             boolean active = key.equals(ui.tab);
             float y = TABS_Y + (active ? 0 : 16);
@@ -503,11 +508,11 @@ public final class Hud {
             p.brightness(active ? STATIC : 0.55f);
             p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
             p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
-            centered(Face.SMALL, 70, 70, (String) tab[1], x, y + (h - 70) / 2f + dy, w, INK);
+            centered(Face.SMALL, TAB_TEXT, TAB_TEXT, (String) tab[1], x, y + (h - TAB_TEXT) / 2f + dy, w, INK);
             p.restore();
             // the tap area reaches down into the page a little: easier to hit with a thumb
             ui.hit(x, y, w, h + 36, () -> ui.tab = key);
-            x += w + 10;
+            x += w + TAB_GAP;
         }
     }
 }
