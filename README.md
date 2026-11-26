@@ -257,30 +257,6 @@ version's section in `CHANGELOG.md`, then run the App workflow (Actions tab)
 with the task `release`; it publishes "Schoolbag X.Y" (tag `vX.Y.Z`) from
 `main` with that section as its notes and removes the test builds toward it.
 
-**Uploading to the Workshop:** GitHub does it. Every push to `main` that
-changes `mod/schoolbag/` or `mod/preview.png` runs the Mod workflow
-(`.github/workflows/mod.yml`): the mod's tests, then Valve's `steamcmd`
-updates Workshop item 3846036075 (the `<id>` in `metadata.xml`) with the mod
-folder, `metadata.xml`'s name and description, `mod/preview.png` (our own art,
-no game art) and a change note: the version's "Mod X.Y.Z" notes in
-`CHANGELOG.md`, or the commit's subject. It never changes the item's
-visibility: it's **private** while testing (enough to subscribe on your own
-account and let GameNative install it on the Thor), and switched to public on
-its Workshop page at release. The Actions tab's Mod, Run workflow uploads
-`main` by hand.
-
-It signs in with a saved `steamcmd` login, not a password: the repository
-secrets `STEAM_USERNAME` and `STEAM_CONFIG_VDF`, made once on a Mac with
-`sh tools/steam_login.sh` (it downloads Valve's `steamcmd` if it isn't
-installed, and with the GitHub CLI signed in it sets the secrets and starts
-the first upload). Run the script again if the workflow says Steam didn't
-accept the login.
-
-By hand, on Windows: copy `mod/schoolbag` into the game's `mods` folder, run
-the game's `tools/ModUploader/ModUploader.exe` and choose that folder's
-`metadata.xml`. It sets the visibility from `metadata.xml`, so make that say
-`Public` too after the release.
-
 ## License
 
 GPL-3.0 (see [`LICENSE`](LICENSE)). It covers Schoolbag's own code and docs. The game's art isn't in this repository and
