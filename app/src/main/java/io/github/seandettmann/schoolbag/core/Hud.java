@@ -197,11 +197,26 @@ public final class Hud {
     }
 
     /**
-     * One of the game's faint pencil sketches on a page. Drawn before the page's
-     * content, so the map or the items cover it where they need the room.
+     * A page's pencil sketches, from a table of {region, x, y, zoom, tilt}: the
+     * game's own doodles, faint (13%) and each turned a few degrees like
+     * something drawn by hand, scattered over the sheet. Drawn before the page's
+     * content, so the map or the items cover them where they need the room. On
+     * the death page, any under the ghost or its line are left out.
      */
-    void sketch(String region, float x, float y, int zoom) {
-        p.sprite(region, x, y, zoom, 0.13f);
+    void sketches(Object[][] table, boolean dead) {
+        for (Object[] s : table) {
+            String region = (String) s[0];
+            int[] size = p.size(region);
+            if (size == null) continue;
+            float x = ((Number) s[1]).floatValue(), y = ((Number) s[2]).floatValue();
+            int zoom = ((Number) s[3]).intValue();
+            float w = size[0] * zoom, h = size[1] * zoom;
+            if (dead && TabMap.underGhost(x, y, w, h)) continue;
+            p.save();
+            p.rotate(((Number) s[4]).floatValue(), x + w / 2f, y + h / 2f);
+            p.sprite(region, x, y, zoom, 0.13f);
+            p.restore();
+        }
     }
 
     /** An item's full description, in the space above the card: the game's info lines, or its pickup line. */

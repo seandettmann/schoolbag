@@ -6,18 +6,21 @@ import java.util.List;
 final class TabRoom {
     private TabRoom() {}
 
+    // the Room tab's own pencil sketches (see Hud.sketches): {region, x, y, zoom, tilt};
+    // the angel and the poop join them when there are items in the room
+    private static final Object[][] SKETCHES = {
+            {"wm_mushroom", 800, 40, 2, 6}, {"doodle_001", 650, 170, 1, -4}, {"wm_face", 130, 250, 2, -10},
+            {"doodle_039", 110, 440, 1, 5}, {"doodle_030", 760, 410, 1, 10}};
+    private static final Object[][] WITH_ITEMS = {
+            {"doodle_033", 380, 320, 2, -3}, {"wm_poop", 90, 340, 2, 4}};
+
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
         Ui ui = h.ui();
         Words w = h.words();
         Hud.page(p, "paper_blank", Hud.EXTRA, 0);
         Json.J room = s.get("room");
-        // the Room tab's own pencil sketches (the angel and the poop join them with items in the room)
-        h.sketch("wm_mushroom", 800, 40, 2);
-        h.sketch("doodle_001", 815, 150, 1);
-        h.sketch("wm_face", 60, 500, 2);
-        h.sketch("doodle_039", 240, 490, 1);
-        h.sketch("doodle_030", 780, 500, 1);
+        h.sketches(SKETCHES, TabMap.dead(s));
         if (TabMap.dead(s)) {
             // the run is over: the death picture, and the strip left blank
             TabMap.ghost(h, player);
@@ -53,8 +56,7 @@ final class TabRoom {
                     "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
             return;
         }
-        h.sketch("doodle_033", 560, 300, 2);
-        h.sketch("wm_poop", 96, 380, 2);
+        h.sketches(WITH_ITEMS, false);
         // items that share an options group: a pencil loop round them, "Take one" under it
         int g0 = -1, g1 = -1, group = 0;
         for (int i = 0; i < peds.size(); i++) {

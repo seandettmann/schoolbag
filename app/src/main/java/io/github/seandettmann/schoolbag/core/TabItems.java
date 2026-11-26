@@ -32,6 +32,12 @@ final class TabItems {
     // where the grid starts under it
     static final int HEADING_DOWN = 6;
     static final float GRID_TOP = 100 + HEADING_DOWN * 3;
+    // the Items tab's own pencil sketches (see Hud.sketches): {region, x, y, zoom, tilt};
+    // the last is on the strip
+    private static final Object[][] SKETCHES = {
+            {"wm_hanger", 760, 34, 2, -8}, {"doodle_022", 250, 180, 1, 6}, {"doodle_009", 690, 196, 1, -12},
+            {"wm_isaac", 440, 290, 1, -6}, {"wm_knife", 120, 300, 2, 18}, {"doodle_028", 180, 450, 1, -5},
+            {"doodle_017", 700, 420, 1, 7}, {"wm_bible", 790, 660 + Hud.EXTRA * 3, 2, -4}};
 
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
@@ -50,15 +56,7 @@ final class TabItems {
         boolean dead = TabMap.dead(s);
         boolean detail = ui.detail && selIndex >= 0 && !dead;
 
-        // the Items tab's own pencil sketches, under the items
-        h.sketch("wm_hanger", 772, 20, 2);
-        h.sketch("wm_isaac", 600, 12, 1);
-        h.sketch("doodle_022", 40, 250, 1);
-        h.sketch("doodle_009", 850, 230, 1);
-        h.sketch("wm_knife", 700, 430, 2);
-        h.sketch("doodle_028", 40, 490, 1);
-        h.sketch("doodle_017", 812, 500, 1);
-        h.sketch("wm_bible", 790, 660 + Hud.EXTRA * 3, 2);
+        h.sketches(SKETCHES, dead);
 
         if (dead) {
             TabMap.ghost(h, player);

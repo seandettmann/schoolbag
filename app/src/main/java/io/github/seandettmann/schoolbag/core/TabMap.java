@@ -62,14 +62,7 @@ final class TabMap {
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
         page(p);
-        // the Map's own pencil sketches, under the map
-        h.sketch("wm_spider", 790, 40, 2);
-        h.sketch("doodle_026", 60, 36, 1);
-        h.sketch("doodle_023", 600, 24, 1);
-        h.sketch("doodle_031", 60, 270, 1);
-        h.sketch("wm_stick", 840, 250, 2);
-        h.sketch("doodle_038", 48, SHEET_BOTTOM - 162, 1);
-        h.sketch("doodle_045", 800, SHEET_BOTTOM - 154, 1);
+        h.sketches(SKETCHES, dead(s));
         Json.J map = s.get("map");
         // between floors the map stays as it was until the next floor's arrives
         if (dead(s)) {
@@ -156,6 +149,19 @@ final class TabMap {
     private static int shape(Json.J r) {
         int s = r.get("shape").integer(1);
         return s >= 1 && s <= 12 ? s : 1;
+    }
+
+    // the Map's own pencil sketches (see Hud.sketches): {region, x, y, zoom, tilt}
+    private static final Object[][] SKETCHES = {
+            {"doodle_026", 96, 52, 1, -10}, {"doodle_023", 400, 34, 1, 4}, {"wm_spider", 770, 96, 2, 12},
+            {"doodle_031", 236, 236, 1, -7}, {"wm_stick", 690, 286, 2, 8}, {"doodle_038", 120, 452, 1, 3},
+            {"doodle_045", 520, 520, 1, -6}, {"doodle_019", 800, 450, 1, -4}};
+
+    /** Whether a box on a sheet would sit under the death picture (the ghost, or who died). */
+    static boolean underGhost(float x, float y, float w, float h) {
+        boolean ghost = x < 588 && x + w > 381 && y < GHOST_TOP + 300 && y + h > GHOST_TOP - 22;
+        boolean line = x < 660 && x + w > 300 && y < GHOST_TOP + 376 && y + h > GHOST_TOP + 296;
+        return ghost || line;
     }
 
     /** The run is over: the game's death screen is up. */
