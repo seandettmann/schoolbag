@@ -29,7 +29,7 @@ local function update(n) frames(2 * (n or 1)) end
 
 local function state()
   local c = assert(socket.connect("127.0.0.1", 8089))
-  c:send("GET /state HTTP/1.1\r\nHost: x\r\n\r\n")
+  c:send("GET /state HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
   frames(1)
   c:settimeout(2)
   local reply = c:receive("*a") or ""

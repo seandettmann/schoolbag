@@ -13,7 +13,7 @@ import java.util.Map;
 
 /**
  * Renders one HUD frame to a PNG, off the device:
- *   java -cp <classes> Render <art bundle> <state.json or -> <out.png> [tab] [settings page]
+ *   java -cp <classes> Render <art bundle> <state.json or -> <out.png> [tab] [settings page] [speed]
  */
 public final class Render {
     public static void main(String[] a) throws Exception {
@@ -24,6 +24,11 @@ public final class Render {
         ui.appVersion = "0.1.0";
         if (a.length > 3) ui.tab = a[3];
         if (a.length > 4) ui.settings = a[4];
+        if (a.length > 5 && a[5].equals("speed")) { // the About page with the longest speed lines likely
+            ui.viewW = 1240; ui.viewH = 1080; ui.viewScale = 1; ui.framesLastMinute = 3600; ui.frameMs = 12.4f;
+            ui.transport = "UDP (sent on changes)"; ui.modVersion = "0.3.0";
+            ui.modPerf = "0.85 ms a state, worst 12.5, worst frame 14.2";
+        }
         Json.J words = Json.parse(new String(Files.readAllBytes(new File(art, "strings/en.json").toPath()), "UTF-8"));
         Map<String, String> w = new HashMap<>();
         for (Map.Entry<String, Object> e : words.map().entrySet()) w.put(e.getKey(), (String) e.getValue());

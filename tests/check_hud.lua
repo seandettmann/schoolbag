@@ -28,7 +28,7 @@ end
 -- what the app does: ask for /state and read the answer
 local function poll(path)
   local c = assert(socket.connect("127.0.0.1", 8089))
-  c:send("GET " .. (path or "/state") .. " HTTP/1.1\r\nHost: x\r\n\r\n")
+  c:send("GET " .. (path or "/state") .. " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
   frames(1) -- the mod answers during the next render frame
   c:settimeout(2)
   local reply = c:receive("*a")

@@ -1,10 +1,12 @@
 # Schoolbag protocol, version 1
 
-The Schoolbag mod runs inside The Binding of Isaac: Repentance+ and answers HTTP
-requests on **`http://127.0.0.1:8089`**. The Schoolbag app polls it and draws
-the bottom-screen HUD. Reading hides the game's own HUD while the app is
-watching (below), and the app sends the mod one thing: the game's words for the
-banners the mod draws in the HUD's place (`POST /strings`).
+The Schoolbag mod runs inside The Binding of Isaac: Repentance+ and listens on
+**`127.0.0.1:8089`**, for HTTP (TCP) and UDP on the same port. The Schoolbag
+app gets the state from it, pushed over UDP when it changes or read over HTTP
+(below), and draws the bottom-screen HUD. While the app is watching, the mod
+hides the game's own HUD (below), and the app sends the mod one thing: the
+game's words for the banners the mod draws in the HUD's place
+(`POST /strings`).
 
 The server only listens on the loopback address, so nothing outside the
 device can reach it.
@@ -20,7 +22,35 @@ device can reach it.
 | `POST /strings` | The game's words, from the app (below). Answers `ok <count>`, or `400` if the body isn't a JSON object. |
 | anything else | `404`. |
 
-Every response has `Connection: close` and `Access-Control-Allow-Origin: *`.
+Every response has `Access-Control-Allow-Origin: *`. Connections are kept
+open for the next request (`Connection: keep-alive`) unless the request says
+`Connection: close` (or is HTTP/1.0 without `keep-alive`); the mod then closes
+after answering. A connection left with nothing going on for 5 seconds is
+closed, and up to 8 can be open at once. Requests and answers never make the
+game wait: the mod reads and sends a little each frame, and a request that
+arrives in pieces is answered once it's all there. A body over 4 MB gets
+`413` and the connection is closed.
+
+## UDP: the state pushed when it changes
+
+Instead of reading `/state` ten times a second, the app can have the mod send
+it. Every second, the app sends one UDP message to `127.0.0.1:8089` from a
+port of its own:
+
+| Message | Meaning |
+|---|---|
+| `hello` | Send me the state. Counts as a `/state` read for hiding the game's HUD. |
+| `hello keep` | The same, but like `?hud=keep`: the game's HUD isn't hidden (and comes straight back if it was). |
+
+The mod answers each hello with the state at once, then sends it to that port
+whenever it changes (checked 10 times a second; `run.timeFrames` alone
+doesn't count) and at least once a second. Each message is the same JSON as
+`GET /state`, in one datagram. A state over 60,000 bytes is sent as
+`{"tooBig":true}` instead: read that one over HTTP. With no hello for 3
+seconds, the mod stops sending (and the game's HUD comes back as usual).
+
+The app should fall back to HTTP when no UDP arrives for a moment but `/state`
+answers (a mod before 0.3.0 has no UDP), and try UDP again now and then.
 
 **When nothing answers:** the mod can only answer while the game is rendering a
 run, so it only listens during one: it starts listening when a run starts or is
@@ -41,9 +71,10 @@ trinket held overhead, a pill or card used, and a card, pill or trinket picked
 up. Brief pauses (room changes) leave it up; it hides while the game has been
 paused for about 3/4 of a second (the pause menu).
 
-**The game's own HUD:** while `/state` is being read, the mod hides the game's
-HUD on the main screen, since the app shows it on the other screen. It comes
-back by itself 3 seconds after the last `/state` read, when the run ends, and
+**The game's own HUD:** while `/state` is being read (or the app keeps saying
+hello over UDP), the mod hides the game's HUD on the main screen, since the
+app shows it on the other screen. It comes back by itself 3 seconds after the
+last `/state` read or hello, when the run ends, and
 on the menus, so a closed app or a switched-off bottom screen never leaves the
 player without a HUD. Reading while paused keeps it
 hidden. Reading with `?hud=keep` never hides it, and gives it back at once if
@@ -93,8 +124,11 @@ in the language the app uses.
   (`#MOMS_KNIFE_NAME` → "Moms Knife") and descriptions are left off.
 - Floor numbers ("I", "II", "XL") are added by the mod, as the game does.
 
-**Polling:** about 10 times a second is plenty. The mod builds the state on
-request, so it costs nothing when the app isn't running.
+**Polling:** over HTTP, about 10 times a second is plenty (2 a second while
+the game is paused is enough). The mod builds the state on request, or for
+UDP only while the app says hello, so it costs nothing when the app isn't
+running. The parts that rarely change (the map, each player's items) are
+encoded again only when they change.
 
 ## Versioning
 
@@ -141,9 +175,12 @@ The mod never sends what the game is hiding from the player:
 ```json
 {
   "protocol": 1,
-  "mod": { "name": "Schoolbag", "version": "0.2.2" },
+  "mod": { "name": "Schoolbag", "version": "0.3.0" },
   "inRun": true,
   "paused": false,
+  "pauseMenu": false,
+  "input": { "mapAt": 81234 },
+  "perf": { "answers": 50, "avgMs": 0.42, "maxMs": 1.1, "frameMaxMs": 1.3, "seconds": 5, "transport": "udp" },
   "humans": 1,
   "strings": 2104,
   "run": { ... },
@@ -165,7 +202,10 @@ The mod never sends what the game is hiding from the player:
 | `hudHidden` | `true` while the mod is hiding the game's HUD. |
 | `problems` | For testing: parts of the mod that failed since the game started (a part of the state, a banner, the boss bar...), each once, at most 30. Empty when all is well. The app can ignore it. |
 | `misses` | For testing: game calls the mod tried that didn't answer, each once, at most 30. Often fine (not every call exists for every character or game version), but a surprise here is the first thing to check when a value is missing. The app can ignore it. |
-| `paused` | The game is on its pause screen. The mod keeps answering while paused. |
+| `paused` | The game is paused: its pause screen, but also for a moment on every room change, and for boss intros and floor changes. The mod keeps answering while paused. |
+| `pauseMenu` | The game's pause menu is open: the pause button was pressed, and the game has been paused for about 3/4 of a second since. The app shows its Items tab then, if it follows the game. |
+| `input.mapAt` | When the Map button was last pressed, in the game's render frames (`Isaac.GetFrameCount()`, 60 a second, counting from the game's start). Only a change means anything: the app shows its Map tab. 0 until it's pressed. |
+| `perf` | For testing: how long the mod spent answering the app over the last 5 seconds (`seconds`): `answers` sent, the average and worst time building and encoding one (`avgMs`, `maxMs`), the worst time the server took in one frame (`frameMaxMs`), and the last `transport` used (`"udp"` or `"http"`). Missing for the first 5 seconds. Changes every 5 seconds, so leave it out when deciding whether anything changed. |
 | `transition` | Present while the player is leaving the floor: `"trapdoor"` or `"beam"`. The app shows the loading doodle until the next floor's data arrives. |
 
 ## `run`

@@ -80,7 +80,7 @@ local function frames(n)
 end
 local function request(method, path, body)
   local c = assert(socket.connect("127.0.0.1", 8089))
-  local head = method .. " " .. path .. " HTTP/1.1\r\nHost: x\r\n"
+  local head = method .. " " .. path .. " HTTP/1.1\r\nHost: x\r\nConnection: close\r\n"
   if body then head = head .. "Content-Type: application/json\r\nContent-Length: " .. #body .. "\r\n" end
   c:send(head .. "\r\n" .. (body or ""))
   local saved = calls

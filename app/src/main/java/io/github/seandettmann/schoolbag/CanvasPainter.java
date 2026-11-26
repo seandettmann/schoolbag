@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import io.github.seandettmann.schoolbag.core.Face;
@@ -68,8 +69,12 @@ final class CanvasPainter implements Painter {
         sprite.setColorFilter(null);
     }
 
+    // a sheet is decoded the first time it's drawn, or ahead of time by preload()
+    // on another thread; the lock is never held while decoding
     private Bitmap bitmap(String path) {
-        if (bitmaps.containsKey(path)) return bitmaps.get(path);
+        synchronized (bitmaps) {
+            if (bitmaps.containsKey(path)) return bitmaps.get(path);
+        }
         Bitmap b = null;
         try (InputStream in = assets.open("art/" + path)) {
             BitmapFactory.Options o = new BitmapFactory.Options();
@@ -77,8 +82,16 @@ final class CanvasPainter implements Painter {
             o.inPreferredConfig = Bitmap.Config.ARGB_8888;
             b = BitmapFactory.decodeStream(in, null, o);
         } catch (Exception ignored) { }
-        bitmaps.put(path, b);
+        synchronized (bitmaps) {
+            if (bitmaps.containsKey(path)) return bitmaps.get(path);
+            bitmaps.put(path, b);
+        }
         return b;
+    }
+
+    /** Decodes every sheet now (about 8 MB), so the first frame of a run doesn't wait for them. */
+    void preload() {
+        for (String sheet : new HashSet<>(regionSheet.values())) bitmap("sheets/" + sheet);
     }
 
     private void blit(Bitmap b, int sx, int sy, int sw, int sh, float x, float y, float zoom, float alpha) {

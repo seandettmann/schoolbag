@@ -68,6 +68,7 @@ final class TabMap {
             dead(h, player);
         } else if (loading) {
             boolean a = (h.now() / 350) % 2 == 0;
+            h.ui().wake((h.now() / 350 + 1) * 350);
             p.sprite(a ? "load_a" : "load_b", 368, 60 + DOWN, 2, 1f);
             h.centered(Face.TITLE, Hud.NAME, Hud.NAME, "Loading...", 0, 356 + DOWN, 960, Hud.INK);
             String leaving = s.get("run").get("difficulty").integer() >= 2
@@ -166,6 +167,7 @@ final class TabMap {
         double t = (h.now() % 2400) / 2400.0;
         float bob = (float) (-12 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t)));
         boolean a = (h.now() / 350) % 2 == 0;
+        h.ui().wake(h.now() + 66); // the ghost bobs
         p.sprite(a ? "ghost_a" : "ghost_b", 391, 64 + DOWN + bob, 3, 1f);
         String who = h.words().text(player.get("name").str());
         if (who.isEmpty()) who = "Isaac";

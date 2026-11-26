@@ -7,8 +7,7 @@ import java.util.Locale;
 /**
  * Draws the bottom screen from the mod's state: the header (actives, hearts,
  * and one line of floor or mode, curses and clock), the pickups scrap, the
- * stats, the two tabs (Map and Items) and their pages, and the waiting and
- * settings pages.
+ * stats, the three tabs and their pages, and the waiting and settings pages.
  * Positions start from the approved mock-ups (1240 x 1080 points); since the
  * Thor tests the header is one line, the tabs sit beside the hearts and the
  * pages are taller.
@@ -27,6 +26,9 @@ public final class Hud {
     static final float NAME = 72;      // an item's name on its card
     static final float BODY = 60;      // the small hand lettering on cards and strips
     static final float DETAIL = 46;    // an item's full description
+    // parts that are the same every run (tab scraps, stat and pickup icons) are
+    // drawn this bright, so they wear the OLED no faster than what changes
+    static final float STATIC = 0.85f;
 
     private final Painter p;
     private final Ui ui;
@@ -39,13 +41,29 @@ public final class Hud {
 
     /** Draws one frame. state is the last answer from the mod, or null if there's none. */
     public static void draw(Painter p, Json.J state, Ui ui, Words words, long nowMs) {
-        ui.hits.clear();
-        new Hud(p, ui, words, nowMs).frame(state);
+        draw(p, state, ui, words, nowMs, true);
     }
 
+    /**
+     * Draws one frame; background false leaves out the floor, for a caller that
+     * keeps it drawn already (the app caches it: it never changes).
+     */
+    public static void draw(Painter p, Json.J state, Ui ui, Words words, long nowMs, boolean background) {
+        ui.hits.clear();
+        ui.wakeAt = Long.MAX_VALUE;
+        Hud h = new Hud(p, ui, words, nowMs);
+        h.background = background;
+        h.frame(state);
+        if (ui.focusNoteUntil > nowMs) h.focusNote();
+    }
+
+    private boolean background = true;
+
     private void frame(Json.J s) {
-        p.rect(0, 0, W, H, 0xFF1D1410);
-        p.tile("floor_basement", 0, 0, W, H, 3);
+        if (background) {
+            p.rect(0, 0, W, H, 0xFF1D1410);
+            p.tile("floor_basement", 0, 0, W, H, 3);
+        }
         if (!"none".equals(ui.settings)) { Pages.settings(this); return; }
         boolean live = s != null && s.get("inRun").bool() && ui.outdated == null && s.get("players").size() > 0;
         if (!live) { Pages.waiting(this); return; }
@@ -58,9 +76,20 @@ public final class Hud {
         p.translate(MX, MY);
         switch (ui.tab) {
             case "map": TabMap.draw(this, s, player); break;
+            case "room": TabRoom.draw(this, s); break;
             default: TabItems.draw(this, s, player);
         }
         p.restore();
+    }
+
+    /** "Tap the top screen to play", over the page, when a tap here took the controller. */
+    private void focusNote() {
+        String t = "Tap the top screen to play";
+        float tw = p.width(Face.TITLE, 64, t);
+        float x = (W - tw) / 2f - 40, y = 470;
+        p.rect(x, y, tw + 80, 120, 0xE0000000);
+        outlined(Face.TITLE, 64, 64, t, x + 40, y + 28, HUDTEXT, 4);
+        ui.wake(ui.focusNoteUntil);
     }
 
     // ---- shared helpers ----
@@ -137,7 +166,7 @@ public final class Hud {
     }
 
     /**
-     * The card at the bottom of the Items tab: the item's picture, name
+     * The card at the bottom of the Items and Room tabs: the item's picture, name
      * and pickup line, and the first of the game's info lines. Tapping it opens
      * (or closes) the item's full description.
      */
@@ -247,7 +276,10 @@ public final class Hud {
     private void drawHeart(Hearts.Heart h, float x, float y, float zoom) {
         if (h.gap) return;
         float a = h.alpha;
-        if (h.pulse) a = (float) (0.525 - 0.175 * Math.cos(2 * Math.PI * (now % 2400) / 2400.0)); // 35-70%, 2.4 s
+        if (h.pulse) {
+            a = (float) (0.525 - 0.175 * Math.cos(2 * Math.PI * (now % 2400) / 2400.0)); // 35-70%, 2.4 s
+            ui.wake(now + 66);
+        }
         p.sprite("h-" + h.sprite, x, y, zoom, a);
         if (h.overlay != null) p.sprite("h-" + h.overlay, x, y, zoom, a);
     }
@@ -370,7 +402,10 @@ public final class Hud {
         else p.sprite("scrap_res", x0, y0, 2, 1f);
         for (int i = 0; i < rows.size(); i++) {
             float ry = y0 + 30 + i * 62;
+            p.save();
+            p.brightness(STATIC);
             p.sprite(rows.get(i)[0], x0 + 34, ry + 4, 3, 1f);
+            p.restore();
             String t = rows.get(i)[1];
             float fs = t.length() > 2 ? 52 : 65;
             text(Face.NUMBER, fs, fs, t, x0 + 34 + 48 + 16, ry + (56 - fs) / 2f, INK);
@@ -411,7 +446,11 @@ public final class Hud {
             boolean chance = i >= 6;
             Json.J v = chance ? ch.get(key) : st.get(key);
             String value = !v.exists() ? "-" : chance ? Math.round(v.num() * 100) + "%" : String.format(Locale.ROOT, "%.2f", v.num());
+            // icons that never change sit a little darker than the numbers (OLED care)
+            p.save();
+            p.brightness(STATIC);
             p.sprite(rows[i][0], 30, y + (rowH - 64) / 2f, 4, 1f);
+            p.restore();
             float tx = 30 + 64 + 20;
             outlined(Face.NUMBER, 52, 52, value, tx, y + (rowH - 52) / 2f, HUDTEXT, 4);
             // the difference beside a stat that just changed, green up, red down
@@ -429,6 +468,8 @@ public final class Hud {
                     int col = c[0] > 0 ? 0xFF63D64A : 0xFFF0504A;
                     int alpha = Math.round(a * 255);
                     outlined(Face.NUMBER, 30, 30, d, dx, y + (rowH - 30) / 2f, (alpha << 24) | (col & 0xFFFFFF), 3);
+                    // full for 2 s, then a half-second fade
+                    ui.wake(this.now - c[1] < 2000 ? (long) c[1] + 2000 : this.now + 50);
                 }
             }
         }
@@ -437,15 +478,16 @@ public final class Hud {
     // ---- tabs ----
 
     /**
-     * The two tabs, beside the hearts. Each is the game's paper scrap widened
-     * to fill the space up to the page's edge: its first columns, then the
-     * art again from an earlier column (a plain band of it drawn twice).
+     * The three tabs, beside the hearts. Each is the game's paper scrap with a
+     * plain band out of its middle (keep the first columns, carry on from a
+     * later one), so all three fit between the hearts and the page's edge.
      */
     private void tabs() {
-        // key, label, art, tilt, label nudge, art height, first columns, then from (141 game pixels wide)
+        // key, label, art, tilt, label nudge, art height, columns kept, carry on from
         Object[][] t = {
-                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 93, 67},
-                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 62, 57}};
+                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 68, 90},
+                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 57, 100},
+                {"room", "Room", "tab_room", -0.7f, 4f, 122f, 59, 100}};
         float x = TABS_X;
         for (Object[] tab : t) {
             final String key = (String) tab[0];
@@ -458,13 +500,14 @@ public final class Hud {
             float y = TABS_Y + (active ? 0 : 16);
             p.save();
             p.rotate((Float) tab[3], x + w / 2f, y + h / 2f);
-            if (!active) p.brightness(0.55f);
+            p.brightness(active ? STATIC : 0.55f);
             p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
             p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
-            centered(Face.SMALL, 75, 75, (String) tab[1], x, y + (h - 75) / 2f + dy, w, INK);
+            centered(Face.SMALL, 70, 70, (String) tab[1], x, y + (h - 70) / 2f + dy, w, INK);
             p.restore();
-            ui.hit(x, y, w, h, () -> ui.tab = key);
-            x += w + 12;
+            // the tap area reaches down into the page a little: easier to hit with a thumb
+            ui.hit(x, y, w, h + 36, () -> ui.tab = key);
+            x += w + 10;
         }
     }
 }

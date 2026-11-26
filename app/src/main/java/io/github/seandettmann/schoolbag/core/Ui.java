@@ -18,8 +18,11 @@ public final class Ui {
     /** "run", "trinket" or "card": what the item card shows. -1 = the newest item. */
     public String selKind = "run";
     public int sel = -1;
+    public int roomSel = 0;
     /** The item card swapped for the item's full description. */
     public boolean detail = false;
+    public boolean roomDetail = false;
+    public int roomIndexSeen = -1;
     public int itemCountSeen = -1;
 
     /** "none", "main", "language" or "about". */
@@ -27,6 +30,16 @@ public final class Ui {
 
     public boolean hideHud = true;
     public boolean dim = true;
+    /**
+     * Follow the game: the Room tab in a room with items and the Map tab on
+     * leaving it, the Map tab when the game's Map button is pressed, and the
+     * Items tab while the game is on its pause menu.
+     */
+    public boolean follow = true;
+    /** A newly picked-up item's card on the Items tab for a few seconds. */
+    public boolean showNewItems = true;
+    /** The whole screen's brightness, in percent: 100, 85 or 70. */
+    public int paperBrightness = 100;
     public String language = "auto";
     /** Set when the language changes, so the app sends the mod the new words. */
     public boolean languageChanged = false;
@@ -47,6 +60,37 @@ public final class Ui {
     final Map<String, Double> lastStats = new HashMap<>();
     final Map<String, double[]> changes = new HashMap<>(); // key -> {difference, at ms}
     String statsOf = null;
+
+    /** Until when (System time, ms) to show "Tap the top screen to play". */
+    public long focusNoteUntil = 0;
+
+    /**
+     * When the frame just drawn next needs drawing again for an animation
+     * (System time, ms), or Long.MAX_VALUE if nothing on it moves. Drawing
+     * code asks with wake(); the view redraws then, or sooner on a change.
+     */
+    public long wakeAt = Long.MAX_VALUE;
+
+    public void wake(long at) { if (at < wakeAt) wakeAt = at; }
+
+    // what the About page shows about speed, filled in by the app
+    public int viewW, viewH;
+    public float viewScale;
+    public int framesLastMinute;
+    public float frameMs;
+    public float readMs = -1;
+    public String transport = "";
+    /** The mod's own timing, from its last report. */
+    public String modPerf = "";
+
+    /** Switches to the next tab (+1) or the previous one (-1), as a swipe does. */
+    public void stepTab(int dir) {
+        String[] order = {"map", "items", "room"};
+        int i = 0;
+        for (int k = 0; k < order.length; k++) if (order[k].equals(tab)) i = k;
+        i = Math.max(0, Math.min(order.length - 1, i + dir));
+        tab = order[i];
+    }
 
     /** Tap targets from the last frame drawn. */
     public final List<Hit> hits = new ArrayList<>();

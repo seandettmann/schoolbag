@@ -26,6 +26,16 @@ def validate(s):
     need(s, "strings", int, "state")  # how many of the game's words the app has sent
     if "hudHidden" in s and not isinstance(s["hudHidden"], bool):
         errs.append("state.hudHidden is not a bool")
+    # optional (mod 0.3.0): the pause menu, the Map button, the mod's own timing
+    if "pauseMenu" in s and not isinstance(s["pauseMenu"], bool):
+        errs.append("state.pauseMenu is not a bool")
+    if "input" in s and not isinstance(s["input"].get("mapAt") if isinstance(s["input"], dict) else None, int):
+        errs.append("state.input.mapAt is not an int")
+    if "perf" in s:
+        perf = s["perf"]
+        if not isinstance(perf, dict) or any(not isinstance(perf.get(k), (int, float))
+                                             for k in ("answers", "avgMs", "maxMs", "frameMaxMs", "seconds")):
+            errs.append("state.perf needs answers, avgMs, maxMs, frameMaxMs and seconds as numbers")
     if not s.get("inRun"):
         return errs
     for key in ("run", "floor", "map", "room", "death"):

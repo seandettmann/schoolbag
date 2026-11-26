@@ -1,6 +1,9 @@
 -- Schoolbag: sends the game's state to the Schoolbag app on the same device.
 --
--- It answers HTTP requests on http://127.0.0.1:8089 (see docs/protocol.md).
+-- It answers HTTP requests on http://127.0.0.1:8089 (see docs/protocol.md),
+-- and, when the app asks for it, sends the state to the app over UDP on the
+-- same port whenever it changes. It never makes the game wait on the app: every
+-- read and send is non-blocking, and half-finished requests carry on next frame.
 -- It only reads game state, apart from hiding the game's HUD while the app
 -- is reading (below).
 -- The server needs the game's --luadebug launch option, because that is what
@@ -14,7 +17,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.2.2"
+local VERSION = "0.3.0"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -509,6 +512,151 @@ local function bagInfo(i, p)
   return { items = items, sure = b.sure }
 end
 
+-- How long the game has been paused, in render frames, and when the Map and
+-- pause buttons were last pressed (Isaac.GetFrameCount()), for the app to
+-- follow the game.
+local signals = { pausedFrames = 0, pauseBegan = 0, mapAt = 0, pauseAt = -1000, PAUSE_MENU = 45 }
+do
+  local ACTION_PAUSE = enum(ButtonAction, "ACTION_PAUSE", 12)
+  local ACTION_MAP = enum(ButtonAction, "ACTION_MAP", 13)
+  function signals.watchMap()
+    local p = Isaac.GetPlayer(0)
+    local ci = p and try(function() return p.ControllerIndex end)
+    if not ci then return end
+    if try(function() return Input.IsActionTriggered(ACTION_MAP, ci) end) then
+      signals.mapAt = Isaac.GetFrameCount()
+    end
+    if try(function() return Input.IsActionTriggered(ACTION_PAUSE, ci) end) then
+      signals.pauseAt = Isaac.GetFrameCount()
+    end
+  end
+  -- The pause menu: paused for 45 render frames (3/4 s), and the pause button
+  -- started it. The game also pauses for room changes (briefly) and for boss
+  -- intros and floor changes (longer), without the button.
+  function signals.pauseMenu()
+    return signals.pausedFrames >= signals.PAUSE_MENU and signals.pauseAt >= signals.pauseBegan - 3
+  end
+end
+
+------------------------------------------------------------------------------
+-- A fast JSON encoder for the state
+------------------------------------------------------------------------------
+-- The state is encoded up to ten times a second, on the game's own thread. This
+-- encoder writes into one buffer, and can splice in text encoded earlier
+-- (fast.raw()), so the parts that rarely change (the map, each player's items)
+-- are only encoded again when they do. Empty tables are arrays, like the game's
+-- json.lua; numbers that aren't finite become null.
+local fast = {}
+do
+  local RAW = {}
+  function fast.raw(text) return setmetatable({ text = text }, RAW) end
+
+  local ESCAPES = { ['"'] = '\\"', ['\\'] = '\\\\', ['\n'] = '\\n', ['\r'] = '\\r', ['\t'] = '\\t' }
+  local function escapeChar(c) return ESCAPES[c] or string.format("\\u%04x", c:byte()) end
+
+  local function encodeInto(v, out)
+    local t = type(v)
+    if t == "string" then
+      out[#out + 1] = '"' .. v:gsub('[%c"\\]', escapeChar) .. '"'
+    elseif t == "number" then
+      if v ~= v or v == math.huge or v == -math.huge then
+        out[#out + 1] = "null"
+      elseif math.type(v) == "integer" then
+        out[#out + 1] = tostring(v)
+      else
+        out[#out + 1] = string.format("%.14g", v)
+      end
+    elseif t == "boolean" then
+      out[#out + 1] = v and "true" or "false"
+    elseif t == "table" then
+      if getmetatable(v) == RAW then
+        out[#out + 1] = v.text
+      elseif next(v) == nil then
+        out[#out + 1] = "[]"
+      elseif v[1] ~= nil then
+        out[#out + 1] = "["
+        for i = 1, #v do
+          if i > 1 then out[#out + 1] = "," end
+          encodeInto(v[i], out)
+        end
+        out[#out + 1] = "]"
+      else
+        out[#out + 1] = "{"
+        local first = true
+        for k, val in pairs(v) do
+          if not first then out[#out + 1] = "," end
+          first = false
+          encodeInto(tostring(k), out)
+          out[#out + 1] = ":"
+          encodeInto(val, out)
+        end
+        out[#out + 1] = "}"
+      end
+    else
+      out[#out + 1] = "null"
+    end
+  end
+
+  function fast.encode(v)
+    local out = {}
+    encodeInto(v, out)
+    return table.concat(out)
+  end
+
+  -- Parts of the state kept as encoded text until their signature changes.
+  local fragments = {}
+  function fast.cached(key, sig, build)
+    local f = fragments[key]
+    if f and f.sig == sig then return f.value end
+    local value = build()
+    if value == nil then fragments[key] = nil return nil end
+    f = { sig = sig, value = fast.raw(fast.encode(value)) }
+    fragments[key] = f
+    return f.value
+  end
+
+  -- The map's signature. mapEpoch is bumped by anything that can change what
+  -- the minimap shows without the room changing (an item, card or pill used, a
+  -- room cleared); the map is also rebuilt once a second regardless, so nothing
+  -- stays stale for long.
+  local mapEpoch = 0
+  function fast.mapChanged() mapEpoch = mapEpoch + 1 end
+  function fast.mapSignature(level, curses)
+    local current = try(function() return level:GetCurrentRoomIndex() end) or -1
+    local p = Isaac.GetPlayer(0)
+    local items = p and try(function() return p:GetCollectibleCount() end) or 0
+    local mirrored = try(function() return game:GetRoom():IsMirrorWorld() end) == true
+    return table.concat({ try(function() return level:GetStage() end) or 0,
+      try(function() return level:GetStageType() end) or 0, curses, current, mapEpoch, items,
+      tostring(mirrored), math.floor(Isaac.GetFrameCount() / 60) }, ":")
+  end
+end
+
+------------------------------------------------------------------------------
+-- How long the mod spends answering the app, for /watch and the app's About page
+------------------------------------------------------------------------------
+-- Measured in 5-second windows: answers sent, their average and worst time
+-- (building and encoding the state), and the worst time the server took in
+-- any one frame.
+local perf = { n = 0, sum = 0, max = 0, frameMax = 0, start = nil, last = nil, transport = "http",
+  clock = (os and os.clock) or function() return Isaac.GetTime() / 1000 end }
+function perf.answer(seconds)
+  perf.n = perf.n + 1
+  perf.sum = perf.sum + seconds
+  if seconds > perf.max then perf.max = seconds end
+end
+function perf.frame(seconds)
+  if seconds > perf.frameMax then perf.frameMax = seconds end
+  local f = Isaac.GetFrameCount()
+  perf.start = perf.start or f
+  if f - perf.start >= 5 * 60 then
+    local function ms(x) return math.floor(x * 100000 + 0.5) / 100 end
+    perf.last = { answers = perf.n, avgMs = perf.n > 0 and ms(perf.sum / perf.n) or 0, maxMs = ms(perf.max),
+      frameMaxMs = ms(perf.frameMax), seconds = math.floor((f - perf.start) / 60 + 0.5) }
+    perf.n, perf.sum, perf.max, perf.frameMax, perf.start = 0, 0, 0, 0, f
+  end
+end
+
 ------------------------------------------------------------------------------
 -- Building the state
 ------------------------------------------------------------------------------
@@ -895,7 +1043,7 @@ local function playerInfo(i, p, curses)
     trinkets = trinketsInfo(p),
     pockets = pocketsInfo(p),
     pills = pillsInfo(p),
-    items = itemsInfo(i),
+    items = fast.cached("items" .. i, table.concat(playerBook(i).order, ","), function() return itemsInfo(i) end),
     forms = formsInfo(p),
     bag = try(function() return bagInfo(i, p) end),
   }
@@ -1001,6 +1149,10 @@ local function buildState()
     mod = { name = "Schoolbag", version = VERSION },
     inRun = run.inRun,
     paused = try(function() return game:IsPaused() end) == true,
+    pauseMenu = signals.pauseMenu(), -- the game's pause menu is open
+    input = { mapAt = signals.mapAt }, -- Isaac.GetFrameCount() of the last Map button press
+    perf = perf.last and { answers = perf.last.answers, avgMs = perf.last.avgMs, maxMs = perf.last.maxMs,
+      frameMaxMs = perf.last.frameMaxMs, seconds = perf.last.seconds, transport = perf.transport } or nil,
     strings = stringCount, -- 0 means the app should send POST /strings
     hudHidden = SchoolbagHudHidden == true, -- the mod is hiding the game's HUD
     problems = problems, -- parts of the mod that failed (for /watch and testing)
@@ -1012,7 +1164,9 @@ local function buildState()
   local curses = level:GetCurses()
   s.run = section("run", runInfo)
   s.floor = section("floor", function() return floorInfo(level, curses) end)
-  s.map = section("map", function() return mapInfo(level, curses) end)
+  s.map = fast.cached("map", fast.mapSignature(level, curses), function()
+    return section("map", function() return mapInfo(level, curses) end)
+  end)
   s.room = section("room", function() return roomInfo(level, curses) end)
   s.players = {}
   s.humans = try(humanCount) or 1
@@ -1034,6 +1188,10 @@ end
 
 local server = nil
 local serverProblem = nil -- "luadebug" when sockets aren't allowed, "bind" when the port is taken
+-- udp: the UDP socket on the same port, if LuaSocket has UDP; clients: open HTTP
+-- connections (see serve()); app: { ip, port, at, keep }, where the app last said
+-- hello from over UDP
+local net = { udp = nil, clients = {}, app = nil, lastPush = nil, lastPushAt = -1000, pushNow = false }
 
 local function startServer(quiet)
   if server or serverProblem then return end
@@ -1055,53 +1213,112 @@ local function startServer(quiet)
   server = srv
   SchoolbagServer = srv
   log("listening on http://" .. HOST .. ":" .. PORT)
+  -- the app's faster way in: the state pushed over UDP when it changes
+  if SchoolbagUdp then
+    net.udp = SchoolbagUdp
+  elseif type(socket.udp) == "function" then
+    local u = socket.udp()
+    if u and u:setsockname(HOST, PORT) then
+      u:settimeout(0)
+      net.udp, SchoolbagUdp = u, u
+    elseif u then
+      pcall(function() u:close() end)
+    end
+  end
 end
 
 -- Only listen during a run. On the menus the game runs no mod code to answer,
 -- so a request would wait forever; with nothing listening, the app and /watch
 -- get a quick "no answer" instead.
 local function stopServer()
+  for _, c in ipairs(net.clients) do pcall(function() c.sock:close() end) end
+  net.clients = {}
   if server then
     pcall(function() server:close() end)
     log("stopped listening until the next run")
   end
-  server, SchoolbagServer = nil, nil
+  if net.udp then pcall(function() net.udp:close() end) end
+  server, SchoolbagServer, net.udp, SchoolbagUdp, net.app = nil, nil, nil, nil, nil
 end
 
 local MAX_BODY = 4 * 1024 * 1024 -- the app's strings are well under this
+net.MAX_HEAD = 16 * 1024
+net.MAX_CLIENTS = 8
+net.IDLE_FRAMES = 5 * 60 -- render frames: an open connection with nothing going on is closed
 
-local function readRequest(client)
-  client:settimeout(0.02)
-  local line = client:receive("*l")
-  if not line then return nil end
-  local method, path = line:match("^(%u+)%s+(%S+)")
-  local length = 0
-  for _ = 1, 50 do -- the headers; only the body's length matters
-    local h = client:receive("*l")
-    if not h or h == "" then break end
-    local n = h:lower():match("^content%-length:%s*(%d+)")
-    if n then length = tonumber(n) end
+-- Every socket is non-blocking (timeout 0): whatever part of a request has
+-- arrived is kept, and the rest is read on later frames; an answer that doesn't
+-- fit in the socket's buffer goes out over the next frames. The game never
+-- waits on the app. Connections stay open between requests (HTTP keep-alive)
+-- unless the client asks to close.
+
+function net.pump(c)
+  for _ = 1, 64 do -- up to 512 KB a frame (the app's words, once a run)
+    local data, err, partial = c.sock:receive(8192)
+    local got = data or partial
+    if got and got ~= "" then
+      c.buf = c.buf .. got
+      c.idle = 0
+    end
+    if err then
+      if err == "closed" then c.closed = true end
+      return
+    end
   end
-  local body
-  if length > 0 and length <= MAX_BODY then
-    client:settimeout(1)
-    body = client:receive(length)
-  end
-  return method, path, body, length
 end
 
-local function respond(client, status, contentType, body)
-  local head = table.concat({
+-- The next complete request in c.buf, or nil while it's still arriving.
+function net.nextRequest(c)
+  local headEnd = c.buf:find("\r\n\r\n", 1, true)
+  if not headEnd then
+    if #c.buf > net.MAX_HEAD then c.closed = true end
+    return nil
+  end
+  local head = c.buf:sub(1, headEnd - 1)
+  local method, path, version = head:match("^(%u+)%s+(%S+)%s*(%S*)")
+  if not method then c.closed = true return nil end
+  local lower = head:lower()
+  local length = tonumber(lower:match("\r\ncontent%-length:%s*(%d+)")) or 0
+  local connection = lower:match("\r\nconnection:%s*([%w%-]+)")
+  local close = connection == "close" or (version == "HTTP/1.0" and connection ~= "keep-alive")
+  if length > MAX_BODY then
+    c.buf = ""
+    return { method = method, path = path, length = length, tooBig = true, close = true }
+  end
+  if #c.buf < headEnd + 3 + length then return nil end
+  local body = length > 0 and c.buf:sub(headEnd + 4, headEnd + 3 + length) or nil
+  c.buf = c.buf:sub(headEnd + 4 + length)
+  return { method = method, path = path, body = body, length = length, close = close }
+end
+
+local function respond(c, status, contentType, body, close)
+  c.out = table.concat({
     "HTTP/1.1 " .. status,
     "Content-Type: " .. contentType,
     "Content-Length: " .. #body,
     "Cache-Control: no-store",
     "Access-Control-Allow-Origin: *",
-    "Connection: close",
+    "Connection: " .. (close and "close" or "keep-alive"),
     "", "",
-  }, "\r\n")
-  client:settimeout(0.25)
-  client:send(head .. body)
+  }, "\r\n") .. body
+  c.sent = 0
+  c.closeAfter = close
+end
+
+function net.flush(c)
+  if not c.out then return end
+  local last, err, partial = c.sock:send(c.out, c.sent + 1)
+  local upto = last or partial
+  if upto and upto > c.sent then
+    c.sent = upto
+    c.idle = 0
+  end
+  if c.sent >= #c.out then
+    c.out = nil
+    if c.closeAfter then c.closed = true end
+  elseif err == "closed" then
+    c.closed = true
+  end
 end
 
 -- A test page for the Thor's browser, for trying the mod before the app exists:
@@ -1147,6 +1364,10 @@ function lines(s) {
   var out = ["mod " + (s.mod ? s.mod.version : "?") + "   time " + new Date().toLocaleTimeString() + "   in run: " + s.inRun +
     "   HUD hidden: " + s.hudHidden + "   words: " + s.strings +
     (s.humans > 1 ? "   CO-OP: " + s.humans + " people (the HUD stays on)" : "")];
+  var pf = s.perf;
+  out.push("speed: " + (pf ? pf.answers + " answers in " + pf.seconds + " s via " + pf.transport + ", " + pf.avgMs +
+    " ms each (worst " + pf.maxMs + " ms), worst frame " + pf.frameMaxMs + " ms" : "measuring (5 s)") +
+    "   pause menu: " + s.pauseMenu + "   map button at frame " + (s.input ? s.input.mapAt : "?"));
   if (!s.inRun) return out;
   var f = s.floor;
   out.push(f ? "floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
@@ -1268,24 +1489,27 @@ tick();
 
 local lastPoll = nil -- Isaac.GetFrameCount() of the app's last /state request
 
-local function handle(client)
-  local method, path, body, length = readRequest(client)
-  if not method then return end
+function net.stateJson()
+  return fast.encode(buildState())
+end
+
+local function handle(c, req)
+  local method, path, body, close = req.method, req.path, req.body, req.close
+  if req.tooBig then
+    respond(c, "413 Payload Too Large", "text/plain", "too big", true)
+    return
+  end
   local query = path:match("%?(.*)$") or ""
   path = path:gsub("%?.*$", "")
   if method == "POST" and path == "/strings" then
-    if length > MAX_BODY then
-      respond(client, "413 Payload Too Large", "text/plain", "too big")
-      return
-    end
     local n = body and takeStrings(body)
     if n then
-      respond(client, "200 OK", "text/plain", "ok " .. n)
+      respond(c, "200 OK", "text/plain", "ok " .. n, close)
     else
-      respond(client, "400 Bad Request", "text/plain", "expected a JSON object of strings")
+      respond(c, "400 Bad Request", "text/plain", "expected a JSON object of strings", close)
     end
   elseif method ~= "GET" then
-    respond(client, "405 Method Not Allowed", "text/plain", "GET, or POST /strings")
+    respond(c, "405 Method Not Allowed", "text/plain", "GET, or POST /strings", close)
   elseif path == "/state" then
     -- the app is watching: see "The game's own HUD". With ?hud=keep (the app's
     -- "Hide the game's HUD" setting off) it reads without hiding anything.
@@ -1294,31 +1518,108 @@ local function handle(client)
     else
       lastPoll = Isaac.GetFrameCount()
     end
-    local ok, body = pcall(function() return json.encode(buildState()) end)
+    local t0 = perf.clock()
+    local ok, text = pcall(net.stateJson)
     if ok then
-      respond(client, "200 OK", "application/json", body)
+      respond(c, "200 OK", "application/json", text, close)
+      perf.answer(perf.clock() - t0)
     else
-      problem("state failed: " .. shortErr(body))
-      respond(client, "500 Internal Server Error", "text/plain", tostring(body))
+      problem("state failed: " .. shortErr(text))
+      respond(c, "500 Internal Server Error", "text/plain", tostring(text), close)
     end
   elseif path == "/health" then
-    respond(client, "200 OK", "text/plain", "ok")
+    respond(c, "200 OK", "text/plain", "ok", close)
   elseif path == "/watch" then
-    respond(client, "200 OK", "text/html; charset=utf-8", WATCH_PAGE)
+    respond(c, "200 OK", "text/html; charset=utf-8", WATCH_PAGE, close)
   else
-    respond(client, "404 Not Found", "text/plain", "not found")
+    respond(c, "404 Not Found", "text/plain", "not found", close)
   end
+end
+
+-- The UDP side: the app says "hello" about once a second ("hello keep" when it
+-- shouldn't hide the game's HUD), and the mod sends it the state as one
+-- datagram whenever the state changes, checked up to 10 times a second, and at
+-- least once a second as a heartbeat. No hello for 3 seconds: it stops.
+net.PUSH_EVERY = 6       -- render frames between checks (10 a second)
+net.HEARTBEAT = 60       -- render frames: the state goes out at least once a second
+net.APP_GONE = 3 * 60    -- render frames without a hello before the mod stops sending
+net.UDP_MAX = 60000      -- bytes; a bigger state tells the app to read over HTTP
+
+function net.serveUdp()
+  local udp = net.udp
+  if not udp then return end
+  for _ = 1, 4 do
+    local data, ip, port = udp:receivefrom()
+    if not data then break end
+    if data:sub(1, 5) == "hello" then
+      local keep = data:find("keep", 6, true) ~= nil
+      net.app = { ip = ip, port = port, at = Isaac.GetFrameCount(), keep = keep }
+      net.pushNow = true
+      -- the app is watching: see "The game's own HUD" (a hello counts like a read of /state)
+      lastPoll = (not keep) and Isaac.GetFrameCount() or nil
+    end
+  end
+  local app = net.app
+  if not app then return end
+  local f = Isaac.GetFrameCount()
+  if f - app.at > net.APP_GONE then
+    net.app, net.lastPush = nil, nil
+    perf.transport = "http"
+    return
+  end
+  if not net.pushNow and f % net.PUSH_EVERY ~= 0 then return end
+  local t0 = perf.clock()
+  local ok, text = pcall(net.stateJson)
+  if not ok then
+    problem("state failed: " .. shortErr(text))
+    return
+  end
+  -- the run clock changes every update; it alone waits for the heartbeat
+  local same = text:gsub('"timeFrames":%d+', "")
+  if net.pushNow or same ~= net.lastPush or f - net.lastPushAt >= net.HEARTBEAT then
+    if #text > net.UDP_MAX then text = '{"tooBig":true}' end
+    udp:sendto(text, app.ip, app.port)
+    net.lastPush, net.lastPushAt, net.pushNow = same, f, false
+    perf.transport = "udp"
+  end
+  perf.answer(perf.clock() - t0)
 end
 
 local function serve()
   if not server then return end
-  for _ = 1, 4 do -- a few waiting requests per frame at most
-    local client = server:accept()
-    if not client then return end
-    local ok, err = pcall(handle, client)
-    if not ok then problem("request failed: " .. shortErr(err)) end
-    pcall(function() client:close() end)
+  local t0 = perf.clock()
+  local clients = net.clients
+  for _ = 1, 4 do -- a few new connections per frame at most
+    if #clients >= net.MAX_CLIENTS then break end
+    local sock = server:accept()
+    if not sock then break end
+    sock:settimeout(0)
+    pcall(function() sock:setoption("tcp-nodelay", true) end)
+    clients[#clients + 1] = { sock = sock, buf = "", sent = 0, idle = 0 }
   end
+  for i = #clients, 1, -1 do
+    local c = clients[i]
+    local ok, err = pcall(function()
+      if not c.out then
+        net.pump(c)
+        local req = net.nextRequest(c)
+        if req then handle(c, req) end
+      end
+      net.flush(c)
+    end)
+    if not ok then
+      problem("request failed: " .. shortErr(err))
+      c.closed = true
+    end
+    c.idle = c.idle + 1
+    if c.closed or c.idle > net.IDLE_FRAMES then
+      pcall(function() c.sock:close() end)
+      table.remove(clients, i)
+    end
+  end
+  local ok, err = pcall(net.serveUdp)
+  if not ok then problem("udp failed: " .. shortErr(err)) end
+  perf.frame(perf.clock() - t0)
 end
 
 ------------------------------------------------------------------------------
@@ -1418,8 +1719,7 @@ local DETAIL_FONTS = { { "font/upheavalmini.fnt", 10 }, { "font/teammeatex/teamm
 -- phase: nil (off), "wait" (until t0), "in", "stay", "out" (each started at t0)
 local remind = { phase = nil, t0 = 0, resumeAt = nil, art = nil }
 
-local pausedFrames = 0 -- render frames the game has been paused for
-local function hiddenByPause() return pausedFrames >= PAUSE_HIDE end
+local function hiddenByPause() return signals.pausedFrames >= PAUSE_HIDE end
 
 local function loadFont(choices)
   for _, c in ipairs(choices) do
@@ -1862,13 +2162,22 @@ mod:AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, function(_, entity, amount, fla
   return nil
 end, K.ENTITY_PLAYER)
 
+-- What the minimap shows can change without a new room: items, cards and pills
+-- used, a room cleared. Any of these makes the next answer encode the map again.
+for _, cb in ipairs({ enum(ModCallbacks, "MC_USE_ITEM", 3), enum(ModCallbacks, "MC_USE_CARD", 5),
+  enum(ModCallbacks, "MC_USE_PILL", 10), enum(ModCallbacks, "MC_PRE_SPAWN_CLEAN_AWARD", 70),
+  enum(ModCallbacks, "MC_POST_NEW_ROOM", 19), enum(ModCallbacks, "MC_POST_NEW_LEVEL", 18) }) do
+  mod:AddCallback(cb, function() fast.mapChanged() end)
+end
+
 -- Served from the render callback, which keeps running while the game is
 -- paused (the update callback doesn't).
 mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
   if try(function() return game:IsPaused() end) then
-    pausedFrames = pausedFrames + 1
+    if signals.pausedFrames == 0 then signals.pauseBegan = Isaac.GetFrameCount() end
+    signals.pausedFrames = signals.pausedFrames + 1
   else
-    pausedFrames = 0
+    signals.pausedFrames = 0
   end
   if not run.inRun and not sawLifecycle then
     -- the mod was loaded mid-run (e.g. `luamod`), so pick the run up
@@ -1879,6 +2188,7 @@ mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
       scanAllPlayers()
     end
   end
+  if run.inRun then pcall(signals.watchMap) end
   serve()
   if run.inRun and not game:IsPaused() then pcall(watchBagCycle) end
   updateGameHud()

@@ -100,7 +100,8 @@ final class TabItems {
         if (zoom == 3) h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
         else h.text(Face.SMALL, 30, 30, String.valueOf(i + 1), x + 2, y + 64, Hud.NUMGREY);
         final int index = i;
-        ui.hit(Hud.MX + x - 5, Hud.MY + y - 5, size + 10, zoom == 3 ? 122 : 92, () -> {
+        // the whole cell, gaps included (120 x 126 at 3x, 80 x 96 at 2x)
+        ui.hit(Hud.MX + x - (zoom == 3 ? 12 : 8), Hud.MY + y - 5, zoom == 3 ? 120 : 80, zoom == 3 ? 126 : 96, () -> {
             ui.sel = index;
             ui.selKind = "run";
             ui.detail = false;

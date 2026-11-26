@@ -37,6 +37,7 @@ final class Pages {
         if ("mod".equals(ui.outdated)) { title = "Mod needs an update"; sub = new String[]{"Restart Isaac to get", "the newest Schoolbag mod."}; }
         else if ("app".equals(ui.outdated)) { title = "App needs an update"; sub = new String[]{"Update Schoolbag", "in Obtainium."}; }
         else if (!ui.everAnswered && h.now() - ui.openedAt > 60_000) sub = new String[]{"Mod on, with --luadebug set?"};
+        if (!ui.everAnswered) ui.wake(ui.openedAt + 60_001);
 
         String doodle = (String) np[6];
         float dh = h.spriteH(doodle, 2), dw = h.spriteW(doodle, 2);
@@ -57,6 +58,16 @@ final class Pages {
         return LANG_NAMES[0];
     }
 
+    /** What the About page says about speed. */
+    static String[] speedLines(Ui ui) {
+        String win = ui.viewW + " x " + ui.viewH + " at " + String.format(java.util.Locale.ROOT, "%.2f", ui.viewScale) + "x"
+                + (ui.viewW == 1240 && ui.viewH == 1080 ? " (pixel for pixel)" : "");
+        String draw = ui.framesLastMinute + " frames in the last minute, " + String.format(java.util.Locale.ROOT, "%.1f", ui.frameMs) + " ms each";
+        String read = ui.transport.isEmpty() ? "Not reading the mod yet"
+                : "Reading the mod over " + ui.transport + (ui.readMs >= 0 ? String.format(java.util.Locale.ROOT, ", %.1f ms a read", ui.readMs) : "");
+        return new String[]{"Screen: " + win, "Drawing: " + draw, read, ui.modPerf.isEmpty() ? "Mod: measuring" : "Mod: " + ui.modPerf};
+    }
+
     static void settings(Hud h) {
         Painter p = h.p();
         Ui ui = h.ui();
@@ -71,34 +82,45 @@ final class Pages {
         float sx = 40, sy = 214;
         p.sprite("np_9", sx, sy, 3, 1f);
         boolean main = "main".equals(page);
-        p.sprite("wm_hanger", sx + (main ? 690 : 930), sy + (main ? 630 : 560), 2, 0.14f);
+        if (!main) p.sprite("wm_hanger", sx + 930, sy + 560, 2, 0.14f); // the main page's rows fill the paper
         float x = sx + 96, y = sy + 62, width = 860;
         String title = "language".equals(page) ? "Banner language" : "about".equals(page) ? "About" : "Settings";
         h.text(Face.TITLE, 90, 90, title, x, y, Hud.INK);
         y += 90 + 14;
         if (main) {
+            // seven rows, 74 points each, to fit the paper
+            float rowH = 74, ts = 50;
             Object[][] rows = {
                     {"Hide the game’s HUD", ui.hideHud, (Runnable) () -> ui.hideHud = !ui.hideHud},
-                    {"Dim when nothing changes", ui.dim, (Runnable) () -> ui.dim = !ui.dim}};
+                    {"Dim when nothing changes", ui.dim, (Runnable) () -> ui.dim = !ui.dim},
+                    {"Follow the game", ui.follow, (Runnable) () -> ui.follow = !ui.follow},
+                    {"Show new items", ui.showNewItems, (Runnable) () -> ui.showNewItems = !ui.showNewItems}};
             for (Object[] r : rows) {
-                h.text(Face.TITLE, 54, 54, (String) r[0], x, y + 19, Hud.INK);
-                p.sprite((Boolean) r[1] ? "check_on" : "check_off", x + width - 57, y + (92 - 51) / 2f, 3, 1f);
-                ui.hit(x, y, width, 92, (Runnable) r[2]);
-                y += 92;
+                h.text(Face.TITLE, ts, ts, (String) r[0], x, y + (rowH - ts) / 2f, Hud.INK);
+                p.sprite((Boolean) r[1] ? "check_on" : "check_off", x + width - 57, y + (rowH - 51) / 2f, 3, 1f);
+                ui.hit(x, y, width, rowH, (Runnable) r[2]);
+                y += rowH;
             }
-            h.text(Face.TITLE, 54, 54, "Banner language", x, y + 19, Hud.INK);
+            // brightness: each tap steps 100% -> 85% -> 70% -> 100%
+            h.text(Face.TITLE, ts, ts, "Brightness", x, y + (rowH - ts) / 2f, Hud.INK);
+            String bv = ui.paperBrightness + "%";
+            h.text(Face.TITLE, ts, ts, bv, x + width - 33 - 14 - p.width(Face.TITLE, ts, bv), y + (rowH - ts) / 2f, Hud.INK);
+            p.sprite("arrow", x + width - 33, y + (rowH - 27) / 2f, 3, 1f);
+            ui.hit(x, y, width, rowH, () -> ui.paperBrightness = ui.paperBrightness <= 70 ? 100 : ui.paperBrightness - 15);
+            y += rowH;
+            h.text(Face.TITLE, ts, ts, "Banner language", x, y + (rowH - ts) / 2f, Hud.INK);
             String ln = langName(ui.language);
-            float lw = p.width(Face.TITLE, 54, ln);
-            h.text(Face.TITLE, 54, 54, ln, x + width - 33 - 14 - lw, y + 19, Hud.INK);
-            p.sprite("arrow", x + width - 33, y + (92 - 27) / 2f, 3, 1f);
-            ui.hit(x, y, width, 92, () -> ui.settings = "language");
-            y += 92;
-            h.text(Face.TITLE, 54, 54, "About", x, y + 19, Hud.INK);
-            String aw = "Credits, AI, version";
+            float lw = p.width(Face.TITLE, ts, ln);
+            h.text(Face.TITLE, ts, ts, ln, x + width - 33 - 14 - lw, y + (rowH - ts) / 2f, Hud.INK);
+            p.sprite("arrow", x + width - 33, y + (rowH - 27) / 2f, 3, 1f);
+            ui.hit(x, y, width, rowH, () -> ui.settings = "language");
+            y += rowH;
+            h.text(Face.TITLE, ts, ts, "About", x, y + (rowH - ts) / 2f, Hud.INK);
+            String aw = "Credits, version, speed";
             float tw = p.width(Face.SMALL, 40, aw);
-            h.text(Face.SMALL, 40, 40, aw, x + width - 33 - 14 - tw, y + 26, Hud.GREY);
-            p.sprite("arrow", x + width - 33, y + (92 - 27) / 2f, 3, 1f);
-            ui.hit(x, y, width, 92, () -> ui.settings = "about");
+            h.text(Face.SMALL, 40, 40, aw, x + width - 33 - 14 - tw, y + (rowH - 40) / 2f + 4, Hud.GREY);
+            p.sprite("arrow", x + width - 33, y + (rowH - 27) / 2f, 3, 1f);
+            ui.hit(x, y, width, rowH, () -> ui.settings = "about");
         } else if ("about".equals(page)) {
             y -= 4;
             h.text(Face.SMALL, 40, 44, "Schoolbag app " + ui.appVersion + " · mod " + (ui.modVersion.isEmpty() ? "?" : ui.modVersion) + " · GPL-3.0", x, y, Hud.GREY);
@@ -108,10 +130,18 @@ final class Pages {
                     "Made with AI, using Claude by Anthropic."};
             for (String l : lines) {
                 for (String part : h.wrap(Face.SMALL, 42, l, width)) {
-                    h.text(Face.SMALL, 42, 50, part, x, y, Hud.INK);
-                    y += 50;
+                    h.text(Face.SMALL, 42, 46, part, x, y, Hud.INK);
+                    y += 46;
                 }
-                y += 22;
+                y += 12;
+            }
+            // speed, for testing on the device: the window, drawing, reading, the mod
+            // (kept up to date once a second while the page is open)
+            ui.wake(h.now() + 1000);
+            y += 8;
+            for (String l : speedLines(ui)) {
+                h.text(Face.SMALL, 36, 40, l, x, y, Hud.GREY);
+                y += 40;
             }
         } else {
             y -= 4;

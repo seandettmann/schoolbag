@@ -106,7 +106,7 @@ ModCallbacks = {
 }
 CollectibleType = { COLLECTIBLE_HOLY_MANTLE = 313, COLLECTIBLE_GUPPYS_COLLAR = 212, COLLECTIBLE_BLANKET = 535,
   COLLECTIBLE_BAG_OF_CRAFTING = 710 }
-ButtonAction = { ACTION_DROP = 11 }
+ButtonAction = { ACTION_DROP = 11, ACTION_PAUSE = 12, ACTION_MAP = 13 }
 -- KnifeVariant, Card and PillColor.PILL_GOLD left out: the mod has fallbacks
 TrinketType = { TRINKET_BROKEN_ANKH = 28, TRINKET_WOODEN_CROSS = 121, TRINKET_GOLDEN_FLAG = 32768 }
 PillColor = { PILL_GIANT_FLAG = 2048 }
@@ -196,7 +196,7 @@ local player = {
   MoveSpeed = 1.0, MaxFireDelay = 10, Damage = 5.25, TearRange = 260, ShotSpeed = 1.0, Luck = 1.0,
 }
 function player:GetPlayerType() return W.playerType or 0 end
-function player:GetName() return "Isaac" end
+function player:GetName() return W.playerName or "Isaac" end
 function player:GetExtraLives() return 1 end
 function player:HasCollectible(id) return (W.items[id] or 0) > 0 end
 function player:GetCollectibleNum(id) return W.items[id] or 0 end
@@ -281,7 +281,11 @@ function game:GetHUD() return hud end
 
 function Game() return game end
 function GetPtrHash(e) return e.hash or e end
-Input = { IsActionTriggered = function(action) return action == ButtonAction.ACTION_DROP and W.dropPressed == true end }
+Input = { IsActionTriggered = function(action)
+  if action == ButtonAction.ACTION_MAP then return W.mapPressed == true end
+  if action == ButtonAction.ACTION_PAUSE then return W.pausePressed == true end
+  return action == ButtonAction.ACTION_DROP and W.dropPressed == true
+end }
 
 Isaac = {
   GetPlayer = function(i) if i == 0 then return player end return (W.extra or {})[i] end,

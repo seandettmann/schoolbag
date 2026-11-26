@@ -17,12 +17,14 @@ There are two pieces, both called Schoolbag:
 | Piece | What it does | Where to get it |
 |---|---|---|
 | **Mod** (`mod/schoolbag`) | Runs inside the game and shares your run with the app over a local-only connection. It never changes the game. | Steam Workshop |
-| **App** (`app/`, coming next) | Draws the HUD on the bottom screen. | GitHub Releases, through Obtainium |
+| **App** (`app/`) | Draws the HUD on the bottom screen. | GitHub Releases, through Obtainium |
 
-The mod answers on `http://127.0.0.1:8089` (loopback only). The app asks it
-for the current state about ten times a second. While the app is reading, the
-mod hides the game's own HUD on the main screen, since the app shows it on the
-bottom screen; it comes back a few seconds after the app stops. Hiding the HUD
+The mod listens on `127.0.0.1:8089` (loopback only). The app says hello over
+UDP once a second, and the mod sends it the state whenever something changes
+(and once a second anyway). If UDP doesn't get through, the app asks over HTTP
+instead, about ten times a second. While the app is watching, the mod hides the
+game's own HUD on the main screen, since the app shows it on the bottom screen;
+it comes back a few seconds after the app stops. Hiding the HUD
 also hides the game's floor, item, pill and card banners and the boss health
 bar, so the mod draws those itself, with the game's own art and the game's
 words sent over by the app.
@@ -39,20 +41,20 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
-- **Mod 0.2.2:** tested against a stand-in for the game's API (see
-  `tests/`), and a first round in the real game on the Thor (0.2.0). 0.2.1
-  fixed what that round found: `/watch` hanging on the menus, the offline
-  banner blinking between rooms and sitting under the game's card banner, and
-  the banners' fonts not matching the game's. 0.2.2 stops the boss bar
-  flashing white when the boss is hit.
-- **App 0.1.0:** first test builds on the Thor, built by GitHub from `app/`
-  and published as releases for Obtainium.
+- **Mod 0.3.0:** tested against a stand-in for the game's API (see
+  `tests/`), and in the real game on the Thor up to 0.2.x. 0.3.0 never makes
+  the game wait on the app, sends the state over UDP only when it changes,
+  encodes it about twice as fast, and reports the pause menu, the Map button
+  and its own timing for the app to follow.
+- **App 0.2.0:** tested on the Thor up to 0.1.0's last build. 0.2.0 leaves the
+  controller with the game when you tap, draws only when something changes,
+  brings back the Room tab, and can follow the game's tabs.
 
 ## Roadmap
 
 **Next**
 - The rest of the app: Jacob & Esau, the Boss Rush and Hush countdowns,
-  transformations, "killed by", every card's picture, scrolling long runs.
+  transformations, "killed by", scrolling long runs.
 - The angel deal chance (the mod doesn't send it yet).
 - The rest of the test checklist on the Thor (banners, boss bar, characters,
   Jacob & Esau, the Bag of Crafting, death).
@@ -96,7 +98,16 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
    nothing else happens.
 3. **App:** add this repository to Obtainium and install the latest release.
    Obtainium will offer updates as they come out.
-4. Start a run. The app connects on its own.
+4. **Bottom screen:** on the Thor, long-press Schoolbag's icon and set
+   **Screen Launch** to the bottom screen. (If it opens on the top screen
+   anyway, it moves itself to the bottom one.)
+5. Start a run. The app connects on its own.
+
+Taps on the bottom screen leave the controller with the game. Just after the
+app opens, it has the controller like any app ("Tap the top screen to play"):
+tap the top screen once. If taps ever start taking the controller (a Thor
+update could change how this works), set the Thor's **Focus Mode** to keep
+focus on the top screen.
 
 `--luadebug` gives every Lua mod you have installed access to files and the
 network, not just this one. Only run mods you trust alongside it.
@@ -104,6 +115,23 @@ network, not just this one. Only run mods you trust alongside it.
 Turn off any other mod that hides the game's HUD while you use Schoolbag.
 Schoolbag brings the HUD back when the app stops reading (and on Tainted Cain
 runs while the Bag of Crafting is full), and another mod would keep hiding it.
+
+## On the bottom screen
+
+- **Tabs:** Map, Items and Room. Tap a tab, or swipe sideways anywhere.
+- **Follow the game** (a setting, on by default): the Room tab when you walk
+  into a room with items and the Map tab when you leave it, the Map tab when
+  you press the game's Map button, and the Items tab while the pause menu is
+  open.
+- **Show new items** (a setting, on by default): a new item's card on the
+  Items tab for 4 seconds, then back to where you were.
+- **Screen care:** the picture creeps a pixel at a time, up to 8 pixels from
+  the middle, and **Dim when nothing changes** fades it after 2 minutes with
+  nothing happening during a run (30 seconds on the pause menu).
+  **Brightness** (100, 85 or 70%) darkens the whole bottom screen. The first
+  tap on a dimmed screen only wakes it.
+- **About** (in the settings) shows the version, and how fast the app is
+  drawing and reading the mod, for testing.
 
 ## Credits and game art
 
@@ -126,6 +154,8 @@ the Workshop image and the app icon are doodles drawn in code.
 ## For developers
 
 ```
+app/                    the Android app (Java): core/ draws the HUD, the rest is the
+                        Android side; dev/ renders a frame to a PNG on a computer
 docs/protocol.md        what the mod sends (protocol 1)
 mod/schoolbag/          the Workshop mod: main.lua + metadata.xml, and resources/ with
                         the boss bar's animation file (it points at the game's own image)
@@ -150,12 +180,13 @@ lua5.3 tests/check_reminder.lua  # the "Schoolbag is offline" banner
 lua5.3 tests/check_hud.lua       # hiding the game's HUD while the app reads
 lua5.3 tests/check_banners.lua   # the banners and boss bar drawn in the HUD's place
 lua5.3 tests/check_bag.lua       # tracking what goes into the Bag of Crafting
+lua5.3 tests/check_net.lua       # never blocking the game, keep-alive, UDP, timing
 ```
 
 **Trying the mod:** copy `mod/schoolbag` into the game's `mods`
 folder, launch with `--luadebug`, start a run and open
 `http://127.0.0.1:8089/watch` in a browser (on the Thor, on the bottom
-screen). That test page reads the mod twice a second, like the app will, so
+screen). That test page reads the mod twice a second, as the app does, so
 the game's HUD stays hidden, and shows the values worth checking. The mod only
 listens during a run, so on the menus the page says "No answer" (and a fresh
 load of it there just fails to connect). It also
