@@ -75,6 +75,15 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
   setting. Revisit if the game's mod API ever lets mods read the bag's result,
   or a calculation that's reliable on Repentance+ turns up, so the preview can
   move to the bottom screen and the main screen can stay clear.
+- **D Infinity's selected die.** The game's HUD shows the die D Infinity is
+  set to, with that die's charge bar; the app shows the plain D Infinity
+  picture. The game keeps the choice in the item's hidden value (`VarData`),
+  which mods can't read without REPENTOGON. The likely way: the mod follows
+  the drop button while D Infinity is held (a best guess, saved with the run,
+  marked "not sure" when it can't be certain), as it does for the Bag of
+  Crafting. Needs first: a photo of the game's HUD on two different dice
+  (which pictures it uses, and where the cycle starts), and, if the game has
+  its own D Infinity pictures, those from the extraction on the PC.
 
 ## Installing (once released)
 
