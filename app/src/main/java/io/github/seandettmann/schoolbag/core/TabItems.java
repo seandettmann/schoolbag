@@ -37,7 +37,10 @@ final class TabItems {
     private static final Object[][] SKETCHES = {
             {"wm_hanger", 760, 34, 2, -8}, {"doodle_022", 250, 180, 1, 6}, {"doodle_009", 690, 196, 1, -12},
             {"wm_isaac", 440, 290, 1, -6}, {"wm_knife", 120, 300, 2, 18}, {"doodle_028", 180, 450, 1, -5},
-            {"doodle_017", 700, 420, 1, 7}, {"wm_bible", 790, 660 + Hud.EXTRA * 3, 2, -4}};
+            {"doodle_017", 700, 420, 1, 7}, {"wm_bible", 790, 660 + Hud.EXTRA * 3, 2, -4},
+            // scribbles: a drip off the top edge, scratches, and on the strip
+            {"sc_drip3", 600, 28, 3, 0}, {"sc_s4", 30, 496, 3, 0}, {"sc_s9", 874, 360, 3, 0}, {"sc_star", 40, 40, 3, 0},
+            {"sc_s3", 28, 640, 3, 0}, {"sc_blot", 862, 652, 3, 0}, {"sc_s10", 440, 790, 3, 0}};
 
     static void draw(Hud h, Json.J s, Json.J player) {
         Painter p = h.p();
@@ -86,15 +89,9 @@ final class TabItems {
     private static void cell(Hud h, Cell c, int i, int selIndex, float x, float y, int zoom) {
         Painter p = h.p();
         Ui ui = h.ui();
-        float size = 32 * zoom;
-        if (i == selIndex) {
-            float b = 4;
-            p.rect(x - 5, y - 5, size + 10, b, Hud.INK);
-            p.rect(x - 5, y - 5 + (zoom == 3 ? 105 : 74) - b, size + 10, b, Hud.INK);
-            p.rect(x - 5, y - 5, b, zoom == 3 ? 105 : 74, Hud.INK);
-            p.rect(x - 5 + size + 10 - b, y - 5, b, zoom == 3 ? 105 : 74, Hud.INK);
-        }
         h.itemCell("items", c.id, x, y, zoom, 1f);
+        // the selected one: a pencil line under it, as under the pocket item in use
+        if (i == selIndex) h.underItem("items", c.id, false, x, y);
         if (c.count > 1) {
             float tx = zoom == 3 ? x + 50 : x + 34, ty = zoom == 3 ? y + 56 : y + 38, fs = zoom == 3 ? 40 : 32;
             String t = "x" + c.count;

@@ -12,7 +12,8 @@ app/src/main/assets/art.
         --pickups <gfx/items/pick ups>
 
 The mock-up sheets (papers in the game's tan palette, tab scraps, heart and
-map sheets...) are made from the same extraction by the mock-up scripts;
+map sheets...) are made from the same extraction by the mock-up scripts, the
+scribbles sheet by cut_scribbles.py and the intro sheet by cut_intro.py;
 folding those scripts in here, so the whole bundle comes from one extraction,
 is next on the list.
 
@@ -88,7 +89,8 @@ def main():
     sheet(os.path.join(a.sheets, 'atlas.png'), 'atlas.png')
     for k, (x, y, w, h) in at['pos'].items():
         regions[k] = ['atlas.png', x, y, w, h]
-    for js, png in (('health_sheet.json', 'health.png'), ('map_sheet.json', 'map.png'), ('pills_sheet.json', 'pills.png')):
+    for js, png in (('health_sheet.json', 'health.png'), ('map_sheet.json', 'map.png'), ('pills_sheet.json', 'pills.png'),
+                    ('scribbles_sheet.json', 'scribbles.png'), ('intro_sheet.json', 'intro.png')):
         d = json.load(open(os.path.join(a.sheets, js)))
         sheet(os.path.join(a.sheets, js.replace('.json', '.png')), png)
         for k, (x, y, w, h) in d['pos'].items():

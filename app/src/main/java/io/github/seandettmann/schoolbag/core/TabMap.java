@@ -155,7 +155,10 @@ final class TabMap {
     private static final Object[][] SKETCHES = {
             {"doodle_026", 96, 52, 1, -10}, {"doodle_023", 400, 34, 1, 4}, {"wm_spider", 770, 96, 2, 12},
             {"doodle_031", 236, 236, 1, -7}, {"wm_stick", 690, 286, 2, 8}, {"doodle_038", 120, 452, 1, 3},
-            {"doodle_045", 520, 520, 1, -6}, {"doodle_019", 800, 450, 1, -4}};
+            {"doodle_045", 520, 520, 1, -6}, {"doodle_019", 800, 450, 1, -4},
+            // scribbles: a drip off the top edge, scratches, and on the strip
+            {"sc_drip1", 300, 28, 3, 0}, {"sc_s1", 40, 566, 3, 0}, {"sc_s12", 866, 300, 3, 0}, {"sc_moon", 690, 590, 3, 0},
+            {"sc_s3", 30, 700, 3, 0}, {"sc_s7", 440, 806, 3, 0}, {"sc_blot", 624, 694, 3, 0}};
 
     /** Whether a box on a sheet would sit under the death picture (the ghost, or who died). */
     static boolean underGhost(float x, float y, float w, float h) {
@@ -252,7 +255,8 @@ final class TabMap {
                 }
                 if ((it.get("color").integer() & 2048) != 0) note = note.isEmpty() ? "Horse pill" : note + ", horse pill";
             } else {
-                name = w.text(it.get("name").str());
+                // a tarot card without its number: "The Fool", not "0 - The Fool"
+                name = w.text(it.get("name").str()).replaceFirst("^[0IVXLC]+ +- +", "");
             }
             float tr = STRIP_X1 - 48 - 16;
             nameLines(h, name, note, color, tr, tr - (STRIP_HALF + 12), cy, true);
@@ -314,9 +318,7 @@ final class TabMap {
         }
         // the pencil line under the one in use, like the open tab's: it stays put
         float ly = cy + 36 + 10, lx = right - 2;
-        p.rect(lx, ly + 1, 18, 4, Hud.INK);
-        p.rect(lx + 18, ly, 20, 4, Hud.INK);
-        p.rect(lx + 38, ly + 2, 14, 4, Hud.INK);
+        Hud.pencil(p, lx, ly, 52);
     }
 
     /** A trinket at 3x (trimmed), its left at x (or its right, mirrored), centred on cy; returns its width. */

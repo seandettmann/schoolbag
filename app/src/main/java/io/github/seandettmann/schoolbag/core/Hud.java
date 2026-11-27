@@ -74,7 +74,12 @@ public final class Hud {
         }
         if (!"none".equals(ui.settings)) { Pages.settings(this); return; }
         boolean live = s != null && s.get("inRun").bool() && ui.outdated == null && s.get("players").size() > 0;
-        if (!live) { Pages.waiting(this); return; }
+        if (!live) {
+            // until the mod first answers, the intro; after that, the waiting page
+            if (!ui.everAnswered && ui.outdated == null) Pages.intro(this);
+            else Pages.waiting(this);
+            return;
+        }
         Json.J player = s.get("players").at(0);
         TabMap.trackPocket(this, player);
         header(s, player);
@@ -168,6 +173,42 @@ public final class Hud {
         return p.picture(kind, id, x + dx, y + dy, z, alpha, true);
     }
 
+    /**
+     * A pencil line, a little uneven like the game's doodles: what marks the open
+     * tab, the pocket item in use, the selected item and a "Take one" group. Short
+     * ones are three strokes; longer ones more, about 48 wide each.
+     */
+    static void pencil(Painter p, float x, float y, float w) {
+        if (w <= 96) {
+            p.rect(x, y + 1, w * 0.35f, 4, INK);
+            p.rect(x + w * 0.35f, y, w * 0.4f, 4, INK);
+            p.rect(x + w * 0.75f, y + 2, w * 0.25f, 4, INK);
+            return;
+        }
+        float[] len = {1.1f, 0.85f, 1.05f, 0.9f, 1.15f, 0.95f}, dy = {1, 0, 2, 1, 0, 2};
+        int n = Math.max(3, Math.round(w / 48));
+        float sum = 0;
+        for (int i = 0; i < n; i++) sum += len[i % len.length];
+        float sx = x;
+        for (int i = 0; i < n; i++) {
+            float sw = w * len[i % len.length] / sum;
+            p.rect(sx, y + dy[i % dy.length], sw, 4, INK);
+            sx += sw;
+        }
+    }
+
+    /**
+     * The pencil line under a selected item in a grid at 3x (its picture's top
+     * left at x, y): just under what's drawn, centred on it, and clear of the
+     * number under the cell.
+     */
+    void underItem(String kind, int id, boolean blind, float x, float y) {
+        int[] b = blind ? null : p.pictureBounds(kind, id);
+        if (b == null) b = new int[]{4, 4, 24, 24};
+        float w = Math.max(48, Math.min(84, b[2] * 3 + 4)), cx = x + (b[0] + b[2] / 2f) * 3;
+        pencil(p, cx - w / 2f, Math.min(y + (b[1] + b[3]) * 3 + 6, y + 92), w);
+    }
+
     /** An item's full 32 x 32 picture (untrimmed), as in the item grids. */
     void itemCell(String kind, int id, float x, float y, int zoom, float alpha) {
         if (!p.picture(kind, id, x, y, zoom, alpha, false))
@@ -230,7 +271,9 @@ public final class Hud {
      * game's own doodles, faint (13%) and each turned a few degrees like
      * something drawn by hand, scattered over the sheet. Drawn before the page's
      * content, so the map or the items cover them where they need the room. On
-     * the death page, any under the ghost or its line are left out.
+     * the death page, any under the ghost or its line are left out. Scribbles
+     * ("sc_" pieces: scratches, drips, little doodles) go in the same tables, but
+     * a little darker and unturned, as the game's own papers have them.
      */
     void sketches(Object[][] table, boolean dead) {
         for (Object[] s : table) {
@@ -241,11 +284,30 @@ public final class Hud {
             int zoom = ((Number) s[3]).intValue();
             float w = size[0] * zoom, h = size[1] * zoom;
             if (dead && TabMap.underGhost(x, y, w, h)) continue;
+            if (region.startsWith("sc_")) { p.sprite(region, x, y, zoom, SCRIBBLE); continue; }
             p.save();
             p.rotate(((Number) s[4]).floatValue(), x + w / 2f, y + h / 2f);
             p.sprite(region, x, y, zoom, 0.13f);
             p.restore();
         }
+    }
+
+    /**
+     * How dark the game's paper scribbles are: its menu papers draw their
+     * scratches, drips and little doodles one tone darker than the paper, about
+     * this much ink on our tan.
+     */
+    static final float SCRIBBLE = 0.22f;
+
+    /**
+     * Scribbles on a scrap (the "sc_" pieces, cut from the game's menu papers):
+     * {region, x, y, zoom} from the scrap's top left at x0, y0. Unrotated, at the
+     * scrap's own zoom, as the game draws them.
+     */
+    static void scribbles(Painter p, Object[][] table, float x0, float y0) {
+        for (Object[] s : table)
+            p.sprite((String) s[0], x0 + ((Number) s[1]).floatValue(), y0 + ((Number) s[2]).floatValue(),
+                    ((Number) s[3]).intValue(), SCRIBBLE);
     }
 
     /** An item's full description, in the space above the card: the game's info lines, or its pickup line. */
@@ -542,11 +604,12 @@ public final class Hud {
      * later one), so all three fit between the hearts and the page's edge.
      */
     private void tabs() {
-        // key, label, art, tilt, label nudge, art height, columns kept, carry on from
+        // key, label, art, tilt, label nudge, art height, columns kept, carry on from, scribbles
         Object[][] t = {
-                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 68, 90},
-                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 57, 100},
-                {"room", "Room", "tab_room", -0.7f, 4f, 122f, 59, 100}};
+                {"map", "Map", "tab_map", -1.5f, 2f, 112f, 68, 90, new Object[][]{{"sc_s3", 160, 18, 2}}},
+                // the Items scrap came with scratches of its own
+                {"items", "Items", "tab_items", 0.8f, -3f, 114f, 57, 100, new Object[][]{}},
+                {"room", "Room", "tab_room", -0.7f, 4f, 122f, 59, 100, new Object[][]{{"sc_s7", 12, 88, 2}}}};
         float x = TABS_X;
         for (Object[] tab : t) {
             final String key = (String) tab[0];
@@ -564,6 +627,7 @@ public final class Hud {
             p.brightness(active ? STATIC : 0.55f);
             p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
             p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
+            scribbles(p, (Object[][]) tab[8], x, y);
             float ty = y + (h - TAB_TEXT) / 2f + dy - TAB_LIFT;
             centered(Face.SMALL, TAB_TEXT, TAB_TEXT, (String) tab[1], x, ty, w, INK);
             if (active) {
@@ -571,9 +635,7 @@ public final class Hud {
                 // ends, so it stays clear of the scrap's torn edges
                 float lw = p.width(Face.SMALL, TAB_TEXT, (String) tab[1]) - 8, lx = x + (w - lw) / 2f;
                 float ly = ty + TAB_TEXT * Face.SMALL.ascent + 1;
-                p.rect(lx, ly + 1, lw * 0.35f, 4, INK);
-                p.rect(lx + lw * 0.35f, ly, lw * 0.4f, 4, INK);
-                p.rect(lx + lw * 0.75f, ly + 2, lw * 0.25f, 4, INK);
+                pencil(p, lx, ly, lw);
             }
             p.restore();
             // the tap area reaches down into the page a little: easier to hit with a thumb

@@ -119,7 +119,8 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 4. **Bottom screen:** on the Thor, long-press Schoolbag's icon and set
    **Screen Launch** to the bottom screen. (If it opens on the top screen
    anyway, it moves itself to the bottom one.)
-5. Start a run. The app connects on its own.
+5. Start a run. The app connects on its own. Until then (Isaac takes a
+   minute or two to start), it shows the game's loading screen.
 
 Taps on the bottom screen leave the controller with the game. Just after the
 app opens, it has the controller like any app ("Tap the top screen to play"):
@@ -150,8 +151,9 @@ runs while the Bag of Crafting is full), and another mod would keep hiding it.
   one's arrives.
 - **Items** ("My Stuff!") and **Room:** 7 items a row, numbered in the order
   you picked them up (or, on the Room tab, left to right in the room). Tap
-  one to see it on the card underneath, and tap the card for the game's whole
-  description. With more than three rows, tap the arrow near the bottom of
+  one to see it on the card underneath (the selected one has a line under
+  it), and tap the card for the game's whole description. In a room where
+  you can take only one, one line runs under all of them, with "Take one". With more than three rows, tap the arrow near the bottom of
   the page or swipe up or down to scroll.
 - **When you die,** every tab shows Isaac's ghost.
 - **Follow the game** (a setting, on by default): the Room tab when you walk
@@ -165,7 +167,7 @@ runs while the Bag of Crafting is full), and another mod would keep hiding it.
   nothing happening during a run (30 seconds on the pause menu).
   **Brightness** (100, 85 or 70%) darkens the whole bottom screen. The first
   tap on a dimmed screen only wakes it.
-- **Settings** (the gear on the waiting page, between runs): besides the
+- **Settings** (the gear before a run and between runs): besides the
   ones above, **Hide the game's HUD** (on by default; off leaves the game's
   own HUD, banners and boss bar alone) and **Banner language** (the language
   of the words the mod draws in the game's banners; Automatic follows the

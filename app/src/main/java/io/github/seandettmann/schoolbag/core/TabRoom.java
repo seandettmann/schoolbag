@@ -6,11 +6,17 @@ import java.util.List;
 final class TabRoom {
     private TabRoom() {}
 
+    // how far under a row's top the "Take one" line runs: under the items' numbers
+    static final float GROUP_LINE = 134;
+
     // the Room tab's own pencil sketches (see Hud.sketches): {region, x, y, zoom, tilt};
     // the angel and the poop join them when there are items in the room
     private static final Object[][] SKETCHES = {
             {"wm_mushroom", 800, 40, 2, 6}, {"doodle_001", 650, 170, 1, -4}, {"wm_face", 130, 250, 2, -10},
-            {"doodle_039", 110, 440, 1, 5}, {"doodle_030", 760, 410, 1, 10}};
+            {"doodle_039", 110, 440, 1, 5}, {"doodle_030", 760, 410, 1, 10},
+            // scribbles: a drip off the top edge, scratches, and on the strip
+            {"sc_drip1", 470, 28, 3, 0}, {"sc_s12", 880, 200, 3, 0}, {"sc_star", 36, 506, 3, 0}, {"sc_crack", 600, 470, 3, 0},
+            {"sc_blot", 36, 642, 3, 0}, {"sc_s7", 500, 812, 3, 0}, {"sc_s6", 866, 790, 3, 0}};
     private static final Object[][] WITH_ITEMS = {
             {"doodle_033", 380, 320, 2, -3}, {"wm_poop", 90, 340, 2, 4}};
 
@@ -57,7 +63,8 @@ final class TabRoom {
             return;
         }
         h.sketches(WITH_ITEMS, false);
-        // items that share an options group: a pencil loop round them, "Take one" under it
+        // items that share an options group: a pencil line under them all (under their
+        // numbers), "Take one" under it
         int g0 = -1, g1 = -1, group = 0;
         for (int i = 0; i < peds.size(); i++) {
             int g = peds.get(i).get("group").integer();
@@ -69,23 +76,21 @@ final class TabRoom {
         int from = first * Hud.GRID_COLS, to = Math.min(peds.size(), (first + Hud.GRID_ROWS) * Hud.GRID_COLS);
         int row0 = g0 / Hud.GRID_COLS;
         if (group > 0 && g1 > g0 && g1 / Hud.GRID_COLS == row0 && g0 >= from && g1 < to) {
-            float lx = Hud.GRID_LEFT + (g0 % Hud.GRID_COLS) * Hud.GRID_STEP_X - 22, ly = 122 + (row0 - first) * Hud.GRID_STEP_Y;
-            p.sprite("loop2", lx, ly, 3, 1f);
-            // "Take one" under the loop, unless another row of items is there
-            if (rows == 1) h.centered(Face.SMALL, 48, 48, "Take one", lx, 302, 261, Hud.INK);
+            float lx = Hud.GRID_LEFT + (g0 % Hud.GRID_COLS) * Hud.GRID_STEP_X;
+            float lw = (g1 - g0) * Hud.GRID_STEP_X + 96, ly = 146 + (row0 - first) * Hud.GRID_STEP_Y + GROUP_LINE;
+            Hud.pencil(p, lx, ly, lw);
+            // "Take one" under the line, unless another row of items is there
+            if (rows == 1) h.centered(Face.SMALL, 48, 48, "Take one", lx, ly + 14, lw, Hud.INK);
         }
         for (int i = from; i < to; i++) {
             Json.J ped = peds.get(i);
             int k = i - from;
             float x = Hud.GRID_LEFT + (k % Hud.GRID_COLS) * Hud.GRID_STEP_X, y = 146 + (k / Hud.GRID_COLS) * Hud.GRID_STEP_Y;
-            if (i == ui.roomSel) {
-                p.rect(x - 5, y - 5, 106, 4, Hud.INK);
-                p.rect(x - 5, y - 5 + 101, 106, 4, Hud.INK);
-                p.rect(x - 5, y - 5, 4, 105, Hud.INK);
-                p.rect(x - 5 + 102, y - 5, 4, 105, Hud.INK);
-            }
-            if (ped.get("blind").bool()) p.sprite("c_question", x, y, 3, 1f);
+            boolean blindOne = ped.get("blind").bool();
+            if (blindOne) p.sprite("c_question", x, y, 3, 1f);
             else h.itemCell("items", ped.get("id").integer(), x, y, 3, 1f);
+            // the selected one: a pencil line under it, as under the pocket item in use
+            if (i == ui.roomSel) h.underItem("items", ped.get("id").integer(), blindOne, x, y);
             h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
             final int index = i;
             ui.hit(Hud.MX + x - 12, Hud.MY + y - 5, 120, 127, () -> { ui.roomSel = index; ui.roomDetail = false; });

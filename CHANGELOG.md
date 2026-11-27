@@ -39,6 +39,23 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   at a time, and points up at the end to go back to the top; a swipe up or
   down on the page scrolls too. The Items tab shows the newest rows until
   you scroll, and a Room with more than 7 pedestals now shows them all.
+- The selected item on the Items and Room tabs gets the same pencil line
+  under it as the pocket item in use, instead of a box. Items you can take
+  only one of get one pencil line under them all, with "Take one" under it,
+  instead of a loop round them.
+- A card held on its own shows its name without the tarot number: "The
+  Fool", not "0 - The Fool".
+- Every paper scrap has some of the game's faint scribbles on it, cut from
+  its own menu papers: scratches, drips off a top edge, a little doodle here
+  and there. The pages, the strips under them, the tab scraps, the waiting
+  papers, the settings paper, and the gear and back buttons all have some.
+- A new intro while Isaac starts up: until the mod first answers, the app
+  shows the game's own loading screen, as it looks up top while Isaac
+  starts: "Loading..." and one of its four little pictures (a different one
+  each time), both wobbling, with a white gear to match for the settings.
+  After a run, the waiting page is as before. The question about the mod and
+  `--luadebug` now comes after three minutes instead of one, since Isaac
+  takes a minute or two to start.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,
