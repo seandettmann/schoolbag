@@ -75,7 +75,9 @@ final class Pages {
         // where the game's loading.anm2 has them: the running Isaac a little further left
         p.sprite(LOADING_PICTURES[pic] + frame, wx + (pic == 0 ? 199 : 207) * 4, 87 * 4, 4, 1f);
         p.sprite("loading_words" + frame, wx + 168 * 4, 146 * 4, 4, 1f);
-        String sub = since > INTRO_HINT_MS ? "Mod on, with --luadebug set?" : "Schoolbag is waiting for Isaac to start.";
+        // the controller first: with it still here, nothing up top answers
+        String sub = ui.tapForController ? "Tap the top screen to play"
+                : since > INTRO_HINT_MS ? "Mod on, with --luadebug set?" : "Schoolbag is waiting for Isaac to start.";
         h.centered(Face.SMALL, 44, 44, sub, wx + 248 * 4 - 400, 190 * 4, 800, LOADING_GREY);
         if (moving) ui.wake(h.now() + INTRO_FRAME_MS - since % INTRO_FRAME_MS);
         if (since <= INTRO_HINT_MS) ui.wake(ui.openedAt + INTRO_HINT_MS + 1);
@@ -132,7 +134,9 @@ final class Pages {
         String draw = ui.framesLastMinute + " frames in the last minute, " + String.format(java.util.Locale.ROOT, "%.1f", ui.frameMs) + " ms each";
         String read = ui.transport.isEmpty() ? "Not reading the mod yet"
                 : "Reading the mod over " + ui.transport + (ui.readMs >= 0 ? String.format(java.util.Locale.ROOT, ", %.1f ms a read", ui.readMs) : "");
-        return new String[]{"Screen: " + win, "Drawing: " + draw, read, ui.modPerf.isEmpty() ? "Mod: measuring" : "Mod: " + ui.modPerf};
+        String mod = ui.modPerf.isEmpty() ? "Mod: measuring" : "Mod: " + ui.modPerf;
+        if (ui.controller.isEmpty()) return new String[]{"Screen: " + win, "Drawing: " + draw, read, mod};
+        return new String[]{"Screen: " + win, "Drawing: " + draw, read, mod, "Controller: " + ui.controller};
     }
 
     static void settings(Hud h) {
@@ -207,10 +211,12 @@ final class Pages {
             // speed, for testing on the device: the window, drawing, reading, the mod
             // (kept up to date once a second while the page is open)
             ui.wake(h.now() + 1000);
-            y += 8;
-            for (String l : speedLines(ui)) {
-                h.text(Face.SMALL, 36, 40, l, x, y, Hud.GREY);
-                y += 40;
+            String[] speed = speedLines(ui);
+            float lead = speed.length > 4 ? 37 : 40; // the controller's line: a little closer, to stay on the paper
+            y += speed.length > 4 ? 2 : 8;
+            for (String l : speed) {
+                h.text(Face.SMALL, 36, lead, l, x, y, Hud.GREY);
+                y += lead;
             }
         } else {
             y -= 4;

@@ -56,6 +56,11 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   After a run, the waiting page is as before. The question about the mod and
   `--luadebug` now comes after three minutes instead of one, since Isaac
   takes a minute or two to start.
+- No more tapping the top screen when the game and Schoolbag start together:
+  Schoolbag hands the controller back to the game as soon as it opens,
+  through the system helper in the Thor's firmware. If that doesn't work,
+  it says "Tap the top screen to play", on the loading screen too.
+  Settings → About says how it went.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,

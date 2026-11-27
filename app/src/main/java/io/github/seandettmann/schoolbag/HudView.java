@@ -223,18 +223,22 @@ final class HudView extends View implements Poller.Listener {
         }
     }
 
-    /** Called when this screen took the controller from the game (the app was opened). */
+    /**
+     * Called when this screen has the controller and couldn't hand it back to
+     * the game: "Tap the top screen to play" for 4 seconds in a run, and on the
+     * intro's line until the game has it again.
+     */
     void focusTaken() {
-        if (live()) {
-            ui.focusNoteUntil = System.currentTimeMillis() + 4_000;
-            invalidate();
-        }
+        ui.tapForController = true;
+        if (live()) ui.focusNoteUntil = System.currentTimeMillis() + 4_000;
+        invalidate();
     }
 
     /** Called when the game has the controller again. */
     void focusGiven() {
-        if (ui.focusNoteUntil != 0) {
+        if (ui.focusNoteUntil != 0 || ui.tapForController) {
             ui.focusNoteUntil = 0;
+            ui.tapForController = false;
             invalidate();
         }
     }

@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.app.ActivityOptions;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Point;
 import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.Display;
 import android.view.View;
 import android.view.WindowInsets;
@@ -19,9 +21,11 @@ import android.view.WindowManager;
  *
  * Opened on the big screen, it moves itself to the small one. Once the game
  * has the controller, this window stops taking it: a tap here never moves the
- * controller away from the game. (While the app itself is in front, as just
- * after opening it, it takes the controller like any app, so the system never
- * waits on a window that can't take one; it says "Tap the top screen to play".)
+ * controller away from the game. While the app itself is in front, as just
+ * after opening it, it takes the controller like any app (so the system never
+ * waits on a window that can't take one), and hands it straight back to the
+ * top screen ({@link HandBack}); if it can't, it says "Tap the top screen to
+ * play".
  */
 public final class MainActivity extends Activity {
     static final String MOVED = "io.github.seandettmann.schoolbag.MOVED";
@@ -30,6 +34,11 @@ public final class MainActivity extends Activity {
     private HudView view;
     private Poller poller;
     private SharedPreferences prefs;
+    private final HandBack handBack = new HandBack(this::handedBack);
+    private boolean top;          // the top app: the controller is here
+    private boolean handBackDue;  // and hasn't been handed back since
+    private long handBacksSince;  // uptime: the half minute the count below is for
+    private int handBacks;
 
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -132,24 +141,87 @@ public final class MainActivity extends Activity {
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && view != null) immersive();
+        if (hasFocus && view != null) {
+            immersive();
+            if (top) giveBack(); // the window has the focus now: hand it on
+        }
     }
 
     /**
      * In front (just opened): able to take the controller, so the system never
-     * waits on this window for keys. Behind the game: never able to, so a tap
-     * here leaves the controller with the game.
+     * waits on this window for keys, and handing it back to the top screen
+     * once the window has it. Behind the game: never able to, so a tap here
+     * leaves the controller with the game.
      */
     @Override public void onTopResumedActivityChanged(boolean top) {
         super.onTopResumedActivityChanged(top);
         if (view == null) return;
+        this.top = top;
         if (top) {
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
-            view.focusTaken();
+            handBackDue = true;
+            if (hasWindowFocus()) giveBack();
         } else {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+            handBackDue = false;
+            handBack.gone();
             view.focusGiven();
         }
+    }
+
+    /**
+     * Hands the controller to the app on the other screen, once each time this
+     * one takes it, and at most three times in half a minute: if something
+     * keeps giving it back here (the Thor's Focus Mode locked to this screen,
+     * say), Schoolbag stops and asks for a tap instead of fighting it.
+     */
+    @SuppressWarnings("deprecation")
+    private void giveBack() {
+        if (!handBackDue || handBack.active()) return;
+        handBackDue = false;
+        long now = SystemClock.uptimeMillis();
+        if (now - handBacksSince > 30_000) { handBacksSince = now; handBacks = 0; }
+        if (++handBacks > 3) {
+            handedBack("Tap the top screen (it keeps coming back here)", true);
+            return;
+        }
+        Display game = gameScreen();
+        if (game == null) {
+            handedBack("Tap the top screen (no other screen)", true);
+            return;
+        }
+        Point size = new Point();
+        game.getRealSize(size);
+        handBack.start(getApplicationInfo().sourceDir, game.getDisplayId(), size.x, size.y);
+    }
+
+    /** The screen the game is on: the main one, unless that's this one; then any other that's on. */
+    @SuppressWarnings("deprecation")
+    private Display gameScreen() {
+        DisplayManager dm = getSystemService(DisplayManager.class);
+        Display here = getWindowManager().getDefaultDisplay(); // this activity's display
+        if (dm == null || here == null) return null;
+        Display other = null;
+        for (Display d : dm.getDisplays()) {
+            if (d.getDisplayId() == here.getDisplayId() || d.getState() != Display.STATE_ON) continue;
+            if ((d.getFlags() & Display.FLAG_PRIVATE) != 0) continue;
+            if (d.getDisplayId() == Display.DEFAULT_DISPLAY) return d;
+            if (other == null) other = d;
+        }
+        return other;
+    }
+
+    /** How the hand-back went: a line for About, and the tap note if the controller is still here. */
+    private void handedBack(String line, boolean failed) {
+        if (view == null) return;
+        view.ui.controller = line;
+        if (failed && top) view.focusTaken();
+        view.invalidate();
+    }
+
+    @Override protected void onDestroy() {
+        handBack.stop();
+        super.onDestroy();
     }
 
     // started and stopped with visibility, not focus: on a two-screen handheld the

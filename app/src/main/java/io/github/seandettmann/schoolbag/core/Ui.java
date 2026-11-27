@@ -63,6 +63,10 @@ public final class Ui {
 
     /** Until when (System time, ms) to show "Tap the top screen to play". */
     public long focusNoteUntil = 0;
+    /** How the controller went back to the game after opening, for About ("" before it's tried). */
+    public String controller = "";
+    /** The controller is still here (the hand-back didn't work): the intro asks for a tap. */
+    public boolean tapForController = false;
 
     /**
      * When the frame just drawn next needs drawing again for an animation

@@ -122,11 +122,17 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 5. Start a run. The app connects on its own. Until then (Isaac takes a
    minute or two to start), it shows the game's loading screen.
 
-Taps on the bottom screen leave the controller with the game. Just after the
-app opens, it has the controller like any app ("Tap the top screen to play"):
-tap the top screen once. If taps ever start taking the controller (a Thor
-update could change how this works), set the Thor's **Focus Mode** to keep
-focus on the top screen.
+Taps on the bottom screen leave the controller with the game. When the app
+opens, Android gives it the controller, as it does any app that opens last;
+Schoolbag hands it straight back to the top screen, so you don't need to tap
+there first. Android only lets the system move the controller between
+screens, so on the Thor this goes through the system helper in AYN's
+firmware (the one behind its "Run Script as Root"). Schoolbag asks it for
+that one thing only, and only in the first few seconds after opening. Where
+the helper can't be reached (with the Thor's **Force SELinux** on, say), the
+app says "Tap the top screen to play": tap it once. If taps ever start taking
+the controller (a Thor update could change how this works), set the Thor's
+**Focus Mode** to keep focus on the top screen.
 
 `--luadebug` gives every Lua mod you have installed access to files and the
 network, not just this one. Only run mods you trust alongside it.
