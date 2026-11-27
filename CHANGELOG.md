@@ -65,6 +65,8 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   items** are gone: walking into a room, picking something up or pausing no
   longer switches tabs. The game's Map button (Select) still brings up the
   Map tab.
+- The Room tab shows an item you haven't collected on this save as its
+  picture with "???" and "Not in your collection yet", as the game does.
 - Easier to read on the Thor: every word is in ink (no more greys), the
   small lettering is bigger (the Map strip's names, item numbers, pickup
   lines), and the closed tabs and the stat and pickup icons are brighter. A
@@ -77,6 +79,11 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   line or curse under it, for items, cards, pills and floors. The
   "Schoolbag is offline" banner keeps its strip, since its line is the fix.
 - The Map button (Select) is noticed again, on any controller.
+- Reads your save's item collection (with --luadebug, from the save file;
+  the game's log says which slot), so the Room tab can leave out the name
+  and description of items you haven't collected on that save, as the
+  game's own Item Descriptions do. If the save can't be found, everything is
+  described as before, and /watch's "collection" line says where it looked.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,

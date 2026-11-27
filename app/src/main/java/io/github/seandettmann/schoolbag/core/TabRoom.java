@@ -55,7 +55,10 @@ final class TabRoom {
             return;
         }
         if (ui.roomSel >= peds.size()) ui.roomSel = 0;
-        if (ui.roomDetail && !peds.get(ui.roomSel).get("blind").bool()) {
+        Json.J chosen = peds.get(ui.roomSel);
+        // not in the save's collection yet (the mod says known: false): no name or description
+        boolean hidden = chosen.get("blind").bool() || chosen.get("known").exists() && !chosen.get("known").bool();
+        if (ui.roomDetail && !hidden) {
             h.itemDetail(peds.get(ui.roomSel).get("id").integer(), 108);
             Json.J sel = peds.get(ui.roomSel);
             h.itemCard(sel.get("id").integer(), sel.get("name").str(), false, true,
@@ -98,7 +101,8 @@ final class TabRoom {
         h.gridScroll(rows, first);
         Json.J sel = peds.get(ui.roomSel);
         boolean blind = sel.get("blind").bool();
-        h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, ui.roomDetail,
+        boolean unknown = !blind && sel.get("known").exists() && !sel.get("known").bool();
+        h.itemCard(sel.get("id").integer(), sel.get("name").str(), blind, unknown, ui.roomDetail,
                 "Tap here again for the room", () -> ui.roomDetail = !ui.roomDetail);
     }
 

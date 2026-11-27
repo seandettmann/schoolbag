@@ -762,6 +762,147 @@ local function mapInfo(level, curses)
   return m
 end
 
+------------------------------------------------------------------------------
+-- The save's item collection (Sean, Nov 27 2026): the Room tab only names and
+-- describes items collected before on this save, as the game's own Item
+-- Descriptions do. Mods can't ask the game (only REPENTOGON can, and it isn't
+-- out for Repentance+), so with --luadebug the mod reads the save file itself.
+--
+-- Repentance+'s persistentgamedata starts "ISAACNGSAVE09R  " and a 4-byte
+-- checksum, then chunks of {id, size, count} (4-byte little-endian numbers)
+-- and their entries: 1 achievements (a byte each), 2 and 3 counters (4 bytes
+-- each), 4 the collection (a byte per item ID, 1 = collected). The game's
+-- log.txt says which slot it loaded and from where ("Loading
+-- PersistentGameData from Steam Cloud: rep+persistentgamedata1.dat."). The
+-- file is looked for in the usual places; read once each run, since the game
+-- saves between runs. If it can't be read, every item is described, as before,
+-- and `collection` in /state says where the mod looked.
+------------------------------------------------------------------------------
+local collection = { known = nil, status = "not read", tried = {} }
+
+-- The collected item IDs in a save file's text (a set), and how many; or nil and why.
+function collection.parse(data)
+  if type(data) ~= "string" or data:sub(1, 14) ~= "ISAACNGSAVE09R" then return nil, "not a Repentance+ save" end
+  local pos = 16 + 4 + 1 -- the header and the checksum; Lua strings count from 1
+  for chunk = 1, 4 do
+    if #data < pos + 11 then return nil, "cut short" end
+    local id, _, count = string.unpack("<I4I4I4", data, pos)
+    if id ~= chunk then return nil, "chunk " .. tostring(id) .. " where " .. chunk .. " belongs" end
+    pos = pos + 12
+    if chunk == 4 then
+      if #data < pos + count - 1 then return nil, "cut short" end
+      local known, n = {}, 0
+      for i = 0, count - 1 do
+        if data:byte(pos + i) == 1 then known[i] = true; n = n + 1 end
+      end
+      return known, n
+    end
+    pos = pos + count * (chunk == 1 and 1 or 4)
+  end
+end
+
+local function readAll(path)
+  local f = io and io.open and io.open(path, "rb")
+  if not f then return nil end
+  local data = f:read("a")
+  f:close()
+  return data
+end
+collection.read = readAll -- tests swap in their own files
+
+-- The slot and source of the last save the game loaded, from its log.txt.
+function collection.fromLog(text)
+  local slot, cloud
+  for line in tostring(text or ""):gmatch("[^\r\n]+") do
+    local n = line:match("Loading PersistentGameData.-persistentgamedata(%d)%.dat")
+    if n then slot, cloud = tonumber(n), line:find("Steam Cloud", 1, true) ~= nil end
+  end
+  return slot, cloud
+end
+
+-- Where a save might be, most likely first.
+function collection.places(env, slot, cloud)
+  local list = {}
+  local function add(p) if p then list[#list + 1] = p end end
+  local profile = env("USERPROFILE")
+  local docs = profile and (profile .. "\\Documents\\My Games\\Binding of Isaac Repentance+\\") or nil
+  local steam = { env("ProgramFiles(x86)"), env("ProgramFiles"), "C:\\Program Files (x86)", "C:\\Program Files" }
+  local name = "rep+persistentgamedata" .. slot .. ".dat"
+  local function cloudPlaces()
+    -- Steam's own folder, for each account in its loginusers.vdf (a SteamID64
+    -- there is 76561197960265728 more than the folder's account number)
+    for _, root in ipairs(steam) do
+      if root then
+        local seen = {}
+        for id in tostring(collection.read(root .. "\\Steam\\config\\loginusers.vdf") or ""):gmatch('"(7656119%d+)"') do
+          local n = math.tointeger(tonumber(id))
+          local account = n and tostring(n - 76561197960265728)
+          if account and not seen[account] then
+            seen[account] = true
+            add(root .. "\\Steam\\userdata\\" .. account .. "\\250900\\remote\\" .. name)
+          end
+        end
+      end
+    end
+    -- Steam stand-ins some launchers use
+    local appdata = env("APPDATA")
+    if appdata then
+      add(appdata .. "\\GSE Saves\\250900\\remote\\" .. name)
+      add(appdata .. "\\Goldberg SteamEmu Saves\\250900\\remote\\" .. name)
+    end
+  end
+  if cloud then cloudPlaces() end
+  if docs then add(docs .. "persistentgamedata" .. slot .. ".dat") end
+  if not cloud then cloudPlaces() end
+  return list, docs
+end
+
+function collection.load()
+  collection.known, collection.tried, collection.path, collection.count = nil, {}, nil, 0
+  collection.slot, collection.cloud, collection.status = nil, nil, "not read"
+  local env = collection.env or (os and os.getenv)
+  if not (env and (collection.read ~= readAll or (io and io.open))) then collection.status = "no file access (--luadebug?)"; return end
+  local profile = env("USERPROFILE")
+  local docs = profile and (profile .. "\\Documents\\My Games\\Binding of Isaac Repentance+\\") or nil
+  local slot, cloud = collection.fromLog(docs and collection.read(docs .. "log.txt"))
+  if not slot then collection.status = "the game's log doesn't say which save"; collection.tried = { docs and (docs .. "log.txt") or "USERPROFILE not set" }; return end
+  collection.slot, collection.cloud = slot, cloud
+  local places = collection.places(env, slot, cloud)
+  for _, path in ipairs(places) do
+    collection.tried[#collection.tried + 1] = path
+    local data = collection.read(path)
+    if data then
+      local known, n = collection.parse(data)
+      if known then
+        collection.known, collection.count, collection.path, collection.status = known, n, path, "read"
+        return
+      end
+      collection.status = path .. ": " .. tostring(n)
+    end
+  end
+  if collection.status == "not read" then collection.status = "save not found" end
+end
+
+-- Whether an item may be named and described: in the save's collection, or held
+-- now (collected this run, before the game has saved). Everything, when the save
+-- couldn't be read.
+function collection.knows(id)
+  if not collection.known then return true end
+  if collection.known[id] then return true end
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    if p and try(function() return p:HasCollectible(id, true) end) then return true end
+  end
+  return false
+end
+
+SchoolbagCollection = collection -- for tests, and for a look from the debug console
+
+function collection.report()
+  return { status = collection.status, slot = collection.slot, cloud = collection.cloud,
+    path = collection.path, items = collection.count, tried = collection.tried }
+end
+
 local function pedestalIsBlind(pickup, curses)
   if curses & K.CURSE_BLIND ~= 0 then return true end
   return try(function() return pickup:IsBlind() end) == true
@@ -792,6 +933,8 @@ local function roomInfo(level, curses)
     else
       entry.id = it.e.SubType
       entry.name = configName("item", it.e.SubType)
+      -- not in the save's collection yet: the app shows its picture but not what it is
+      if not collection.knows(it.e.SubType) then entry.known = false end
     end
     r.pedestals[#r.pedestals + 1] = entry
   end
@@ -1162,6 +1305,7 @@ local function buildState()
     hudHidden = SchoolbagHudHidden == true, -- the mod is hiding the game's HUD
     problems = problems, -- parts of the mod that failed (for /watch and testing)
     misses = misses,     -- game calls that didn't answer (often fine)
+    collection = collection.report(), -- how the save's item collection was read (for /watch)
   }
   if not run.inRun then return s end
 
@@ -1373,6 +1517,10 @@ function lines(s) {
   out.push("speed: " + (pf ? pf.answers + " answers in " + pf.seconds + " s via " + pf.transport + ", " + pf.avgMs +
     " ms each (worst " + pf.maxMs + " ms), worst frame " + pf.frameMaxMs + " ms" : "measuring (5 s)") +
     "   pause menu: " + s.pauseMenu + "   map button at frame " + (s.input ? s.input.mapAt : "?"));
+  var col = s.collection;
+  if (col) out.push("collection: " + col.status + (col.status == "read" ? ", " + col.items + " items in slot " + col.slot +
+    (col.cloud ? " (Steam Cloud)" : "") + " from " + col.path : "") +
+    (col.status != "read" && col.tried && col.tried.length ? "   looked in: " + col.tried.join(" | ") : ""));
   if (!s.inRun) return out;
   var f = s.floor;
   out.push(f ? "floor: stage " + f.stage + " type " + f.stageType + ", curses " + f.curses +
@@ -2128,6 +2276,7 @@ mod:AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function(_, isContinued)
   remind.phase, remind.resumeAt = nil, nil
   armReminder()
   scanAllPlayers()
+  if not pcall(collection.load) then collection.known, collection.status = nil, "failed reading the save" end
 end)
 
 mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function(_, shouldSave)

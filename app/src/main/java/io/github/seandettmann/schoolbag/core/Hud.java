@@ -230,11 +230,21 @@ public final class Hud {
      * place (Nov 27 2026: bigger lettering, and both lines no longer fit).
      */
     void itemCard(int id, String nameCode, boolean blind, boolean open, String back, Runnable toggle) {
+        itemCard(id, nameCode, blind, false, open, back, toggle);
+    }
+
+    /**
+     * As above; unknown is an item not in the save's collection yet (Nov 27 2026):
+     * its picture shows, as on its pedestal, but not its name or what it does,
+     * as the game's own Item Descriptions do.
+     */
+    void itemCard(int id, String nameCode, boolean blind, boolean unknown, boolean open, String back, Runnable toggle) {
         float x0 = CARD_X0, cy = CARD_MID;
         if (blind) p.sprite("c_question", x0, cy - 64, 4, 1f);
         else itemCell("items", id, x0, cy - 64, 4, 1f);
-        String name = blind ? "???" : w.text(nameCode);
-        String quote = blind ? "Curse of the Blind hides this one" : w.quote("collectibles", id);
+        String name = blind || unknown ? "???" : w.text(nameCode);
+        String quote = blind ? "Curse of the Blind hides this one"
+                : unknown ? "Not in your collection yet" : w.quote("collectibles", id);
         float tx = x0 + 128 + 32, tw = CARD_X1 - tx;
         float top = cy - (70 + 64) / 2f;
         text(Face.TITLE, 64, 70, fit(Face.TITLE, 64, name, tw), tx, top, INK);
@@ -244,7 +254,7 @@ public final class Hud {
             float qs = p.width(Face.SMALL, 58, quote) <= tw ? 58 : p.width(Face.SMALL, 52, quote) <= tw ? 52 : 46;
             text(Face.SMALL, qs, 64, fit(Face.SMALL, qs, quote, tw), tx, top + 70 + (58 - qs) / 2f, INK);
         }
-        if (!blind) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
+        if (!blind && !unknown) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
     }
 
     // the Items and Room grids: 7 items a row at 3x, 120 apart, three rows in view,

@@ -200,6 +200,7 @@ The mod never sends what the game is hiding from the player:
 | `humans` | How many people are playing (one per controller). More than 1 is co-op, and the mod leaves the game's HUD on. |
 | `strings` | How many of the game's words the app has sent with `POST /strings`. 0 means send them. |
 | `hudHidden` | `true` while the mod is hiding the game's HUD. |
+| `collection` | How the save's item collection was read, once a run: `status` ("read", "save not found", "the game's log doesn't say which save", "no file access (--luadebug?)", or a file and why it couldn't be used), and once read `slot` (1–3), `cloud` (from the game's log), `path` and `items` (how many collected); `tried` lists where it looked. For /watch; the app only uses `pedestals[].known`. |
 | `problems` | For testing: parts of the mod that failed since the game started (a part of the state, a banner, the boss bar...), each once, at most 30. Empty when all is well. The app can ignore it. |
 | `misses` | For testing: game calls the mod tried that didn't answer, each once, at most 30. Often fine (not every call exists for every character or game version), but a surprise here is the first thing to check when a value is missing. The app can ignore it. |
 | `paused` | The game is paused: its pause screen, but also for a moment on every room change, and for boss intros and floor changes. The mod keeps answering while paused. |
@@ -268,6 +269,7 @@ The mod never sends what the game is hiding from the player:
 | `pedestals[].id`, `name` | The item on the pedestal. Left out when blind. Empty pedestals aren't listed. |
 | `pedestals[].blind` | `true` when the game shows a "?" instead of the item. |
 | `pedestals[].group` | "Choose one" group (`OptionsPickupIndex`); 0 = not part of a group. |
+| `pedestals[].known` | `false` when the item isn't in the save's collection yet (not collected on this save, and not held now): the app shows its picture but not its name or description, as the game's own Item Descriptions do. Left out otherwise, and always left out when the save couldn't be read (see `collection`). |
 
 Prices aren't sent. The game already shows them on screen, so the app numbers
 the items the same way in every room, shops and devil deals included.
