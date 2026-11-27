@@ -17,7 +17,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.3.1"
+local VERSION = "0.3.2"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -512,29 +512,34 @@ local function bagInfo(i, p)
   return { items = items, sure = b.sure }
 end
 
--- How long the game has been paused, in render frames, and when the Map and
--- pause buttons were last pressed (Isaac.GetFrameCount()), for the app to
--- follow the game.
-local signals = { pausedFrames = 0, pauseBegan = 0, mapAt = 0, pauseAt = -1000, PAUSE_MENU = 45 }
+-- How long the game has been paused, in render frames, and when the Map button
+-- was last pressed (Isaac.GetFrameCount()), for the app.
+--
+-- The Map button: the game reads its own Map press before the render callback,
+-- and a trigger read once doesn't report again, so IsActionTriggered misses it
+-- here. Whether the button is held isn't used up, so a press is counted when it
+-- goes down. Controller -1 is every controller (Rep+ 1.9.7.19 renumbered them:
+-- the keyboard is -2 and pads start at 0), with the player's own as a fallback.
+--
+-- The pause menu can't be seen: the game doesn't let mods detect the pause
+-- button (ACTION_PAUSE "can only be detected when holding P after closing the
+-- pause menu"). So `pauseMenu` means paused for 3/4 s or more: the pause menu,
+-- but also boss intros and floor changes. The app only uses it for dimming.
+local signals = { pausedFrames = 0, mapAt = 0, mapHeld = false, PAUSE_MENU = 45 }
 do
-  local ACTION_PAUSE = enum(ButtonAction, "ACTION_PAUSE", 12)
   local ACTION_MAP = enum(ButtonAction, "ACTION_MAP", 13)
+  local function mapDown(ci)
+    return try(function() return Input.IsActionPressed(ACTION_MAP, ci) end) == true
+  end
   function signals.watchMap()
     local p = Isaac.GetPlayer(0)
     local ci = p and try(function() return p.ControllerIndex end)
-    if not ci then return end
-    if try(function() return Input.IsActionTriggered(ACTION_MAP, ci) end) then
-      signals.mapAt = Isaac.GetFrameCount()
-    end
-    if try(function() return Input.IsActionTriggered(ACTION_PAUSE, ci) end) then
-      signals.pauseAt = Isaac.GetFrameCount()
-    end
+    local held = mapDown(-1) or (ci ~= nil and mapDown(ci))
+    if held and not signals.mapHeld then signals.mapAt = Isaac.GetFrameCount() end
+    signals.mapHeld = held
   end
-  -- The pause menu: paused for 45 render frames (3/4 s), and the pause button
-  -- started it. The game also pauses for room changes (briefly) and for boss
-  -- intros and floor changes (longer), without the button.
   function signals.pauseMenu()
-    return signals.pausedFrames >= signals.PAUSE_MENU and signals.pauseAt >= signals.pauseBegan - 3
+    return signals.pausedFrames >= signals.PAUSE_MENU
   end
 end
 
@@ -1149,7 +1154,7 @@ local function buildState()
     mod = { name = "Schoolbag", version = VERSION },
     inRun = run.inRun,
     paused = try(function() return game:IsPaused() end) == true,
-    pauseMenu = signals.pauseMenu(), -- the game's pause menu is open
+    pauseMenu = signals.pauseMenu(), -- paused for 3/4 s or more (the pause menu, a boss intro, a floor change)
     input = { mapAt = signals.mapAt }, -- Isaac.GetFrameCount() of the last Map button press
     perf = perf.last and { answers = perf.last.answers, avgMs = perf.last.avgMs, maxMs = perf.last.maxMs,
       frameMaxMs = perf.last.frameMaxMs, seconds = perf.last.seconds, transport = perf.transport } or nil,
@@ -1712,6 +1717,12 @@ local REMIND_TITLE = "Schoolbag is offline"
 local REMIND_DETAIL = { luadebug = "Needs --luadebug", bind = "Port " .. PORT .. " is busy" }
 local INK = { 54 / 255, 47 / 255, 45 / 255 } -- the dark ink the game writes on paper with
 
+-- Titles only (Sean, Nov 27 2026): every banner the mod draws is the name on
+-- the ink, without the paper strip and its line under it. Setting
+-- `SchoolbagBannerPaper = true` (in the debug console, or a test) brings the
+-- strip back.
+local function bannerPaper() return SchoolbagBannerPaper == true end
+
 -- The game writes its banners in Upheaval: the big size on the ink, the small
 -- one on the paper. Each font comes with how far down to start writing so its
 -- letters sit in the middle (of the ink, or of the paper strip).
@@ -1889,17 +1900,17 @@ local function drawReminder()
 
   local art = reminderArt()
   local x, y = Isaac.GetScreenWidth() / 2, REMIND_Y
-  local detail = REMIND_DETAIL[serverProblem] or ""
+  local detail = bannerPaper() and (REMIND_DETAIL[serverProblem] or "") or nil
   if not (art.streak and art.title and art.detail) then
     -- the game's art or fonts couldn't be found: plain text instead
     if words then
-      local line = REMIND_TITLE .. ": " .. detail
+      local line = REMIND_TITLE .. (detail and (": " .. detail) or "")
       local w = try(function() return Isaac.GetTextWidth(line) end) or 0
       Isaac.RenderText(line, x - w / 2, y - 6, 1, 1, 1, 1)
     end
     return
   end
-  drawStreak(art, anim, frame, x, y, REMIND_TITLE, detail, words) -- ink and paper fly in together
+  drawStreak(art, anim, frame, x, y, REMIND_TITLE, detail, words) -- the ink (and its paper, if kept)
 end
 
 -- A busy port may come free during the run: try again every few seconds.
@@ -1979,7 +1990,8 @@ end
 
 local function showBanner(title, detail)
   if not title or title == "" then return end
-  banner = { title = title, detail = detail ~= "" and detail or nil, t0 = now() }
+  local keep = bannerPaper() and detail ~= nil and detail ~= ""
+  banner = { title = title, detail = keep and detail or nil, t0 = now() }
 end
 
 -- An item held overhead is the moment the game shows its name.
@@ -2215,7 +2227,6 @@ end
 -- paused (the update callback doesn't).
 mod:AddCallback(ModCallbacks.MC_POST_RENDER, function()
   if try(function() return game:IsPaused() end) then
-    if signals.pausedFrames == 0 then signals.pauseBegan = Isaac.GetFrameCount() end
     signals.pausedFrames = signals.pausedFrames + 1
   else
     signals.pausedFrames = 0

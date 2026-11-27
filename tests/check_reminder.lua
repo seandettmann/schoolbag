@@ -27,6 +27,7 @@ local function fresh(opts)
     end
   end
   SchoolbagServer = nil
+  SchoolbagBannerPaper = not opts.titlesOnly or nil -- the paper strip is kept for most of these checks
   dofile("tests/stub_isaac.lua")
   calls = {}
   -- the game's drawing API, recorded
@@ -202,6 +203,21 @@ local t = find(c, "text")
 check(t and t.a == "Schoolbag is offline: Needs --luadebug" and not find(c, "sprite"), "falls back to plain text")
 c = frames(30 * 60)
 check(find(c, "text") ~= nil, "and that stays up too")
+
+print("titles only (the default since Nov 27 2026)")
+fresh({ noSocket = true, titlesOnly = true })
+fire(ModCallbacks.MC_POST_GAME_STARTED, false)
+c = frames(4 * 30 + 10)
+local layer = find(c, "layer", "gfx/ui/ui_streak.anm2")
+check(layer and layer.b == "TextStay:0" and layer.c.layer == 0 and not find(c, "sprite"),
+  "only the ink is drawn, no paper strip")
+check(find(c, "font", "Schoolbag is offline") and #(function() local n = {} for _, x in ipairs(c) do if x.kind == "font" then n[#n + 1] = x end end return n end)() == 1,
+  "just the title, no detail line")
+fresh({ noSocket = true, titlesOnly = true, noArt = true })
+fire(ModCallbacks.MC_POST_GAME_STARTED, false)
+c = frames(4 * 30 + 10)
+t = find(c, "text")
+check(t and t.a == "Schoolbag is offline", "the plain-text fallback is the title alone")
 
 print("server running")
 fresh({})

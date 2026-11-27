@@ -147,32 +147,27 @@ end
 local before = state().input.mapAt
 W.mapPressed = true
 frames(1)
+local s1 = state()
+check(s1.input.mapAt > before, "pressing the Map button moves input.mapAt")
+frames(30)
+check(state().input.mapAt == s1.input.mapAt, "holding it down counts once")
 W.mapPressed = false
 frames(1)
+W.mapController, W.mapPressed = 3, true -- a pad the player's index doesn't name
+frames(1)
+W.mapPressed, W.mapController = false, nil
+frames(1)
 local s2 = state()
-check(s2.input.mapAt > before, "pressing the Map button moves input.mapAt")
+check(s2.input.mapAt > s1.input.mapAt, "a press on any controller counts")
 check(s2.pauseMenu == false, "not paused: no pause menu")
 W.paused = true
-frames(60)
-check(state().pauseMenu == false, "a long pause without the pause button (a boss intro) isn't the pause menu")
-W.paused = false
-frames(2)
-W.pausePressed = true
-frames(1)
-W.pausePressed = false
-W.paused = true
 frames(20)
-check(state().pauseMenu == false, "a short pause isn't the pause menu yet")
+check(state().pauseMenu == false, "a short pause (a room change) isn't the pause menu")
 frames(40)
-check(state().pauseMenu == true, "the pause button, then paused for 3/4 of a second: the pause menu")
+check(state().pauseMenu == true, "paused for 3/4 of a second: counted as the pause menu")
 W.paused = false
 frames(2)
 check(state().pauseMenu == false, "unpaused again")
-W.paused = true
-frames(60)
-check(state().pauseMenu == false, "the next pause without the button isn't the pause menu")
-W.paused = false
-frames(2)
 
 print("the encoder")
 W.playerName = 'Is"aac\\ \n\1'

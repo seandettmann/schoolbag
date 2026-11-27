@@ -161,13 +161,11 @@ final class Pages {
         h.text(Face.TITLE, 90, 90, title, x, y, Hud.INK);
         y += 90 + 14;
         if (main) {
-            // seven rows, 74 points each, to fit the paper
+            // five rows, 74 points each
             float rowH = 74, ts = 50;
             Object[][] rows = {
                     {"Hide the game’s HUD", ui.hideHud, (Runnable) () -> ui.hideHud = !ui.hideHud},
-                    {"Dim when nothing changes", ui.dim, (Runnable) () -> ui.dim = !ui.dim},
-                    {"Follow the game", ui.follow, (Runnable) () -> ui.follow = !ui.follow},
-                    {"Show new items", ui.showNewItems, (Runnable) () -> ui.showNewItems = !ui.showNewItems}};
+                    {"Dim when nothing changes", ui.dim, (Runnable) () -> ui.dim = !ui.dim}};
             for (Object[] r : rows) {
                 h.text(Face.TITLE, ts, ts, (String) r[0], x, y + (rowH - ts) / 2f, Hud.INK);
                 p.sprite((Boolean) r[1] ? "check_on" : "check_off", x + width - 57, y + (rowH - 51) / 2f, 3, 1f);

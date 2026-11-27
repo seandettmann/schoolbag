@@ -30,14 +30,6 @@ public final class Ui {
 
     public boolean hideHud = true;
     public boolean dim = true;
-    /**
-     * Follow the game: the Room tab in a room with items and the Map tab on
-     * leaving it, the Map tab when the game's Map button is pressed, and the
-     * Items tab while the game is on its pause menu.
-     */
-    public boolean follow = true;
-    /** A newly picked-up item's card on the Items tab for a few seconds. */
-    public boolean showNewItems = true;
     /** The whole screen's brightness, in percent: 100, 85 or 70. */
     public int paperBrightness = 100;
     public String language = "auto";

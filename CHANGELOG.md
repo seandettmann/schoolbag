@@ -61,6 +61,16 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   through the system helper in the Thor's firmware. If that doesn't work,
   it says "Tap the top screen to play", on the loading screen too.
   Settings → About says how it went.
+- The tabs stay where you put them. **Follow the game** and **Show new
+  items** are gone: walking into a room, picking something up or pausing no
+  longer switches tabs. The game's Map button (Select) still brings up the
+  Map tab.
+
+**Mod 0.3.2**
+- Banners show the name alone, on the ink: no paper strip with a pickup
+  line, curse or detail under it, for items, cards, pills, floors and the
+  "Schoolbag is offline" banner alike.
+- The Map button (Select) is noticed again, on any controller.
 
 **Mod 0.3.1**
 - A banner line too long for the paper strip under it gets a longer strip,

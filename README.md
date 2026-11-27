@@ -41,13 +41,12 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Status
 
-- **Mod 0.3.1** (on the Workshop, private while testing): tested against a
+- **Mod 0.3.2** (on the Workshop, private while testing): tested against a
   stand-in for the game's API (see `tests/`), and in the real game on the
-  Thor up to 0.2.x. Since 0.3.0 it never makes the game wait on the app,
-  sends the state over UDP only when it changes, and reports the pause menu,
-  the Map button and its own timing for the app to follow. 0.3.1 gives a
-  banner line too long for its paper strip (about half the cards) a longer
-  strip.
+  Thor up to 0.3.1. Since 0.3.0 it never makes the game wait on the app,
+  sends the state over UDP only when it changes, and reports the Map button
+  and its own timing. 0.3.2 draws every banner as the name on the ink
+  alone, without the paper strip under it.
 - **App 0.3.0** (test builds, the newest a pre-release): 0.2.0 is the last
   release. 0.3.0 reworks the pages after the first Thor tests: tabs that
   don't move, a new strip under each page, scrolling grids of 7 a row on the
@@ -162,15 +161,11 @@ runs while the Bag of Crafting is full), and another mod would keep hiding it.
   you can take only one, one line runs under all of them, with "Take one". With more than three rows, tap the arrow near the bottom of
   the page or swipe up or down to scroll.
 - **When you die,** every tab shows Isaac's ghost.
-- **Follow the game** (a setting, on by default): the Room tab when you walk
-  into a room with items and the Map tab when you leave it, the Map tab when
-  you press the game's Map button, and the Items tab while the pause menu is
-  open.
-- **Show new items** (a setting, on by default): a new item's card on the
-  Items tab for 4 seconds, then back to where you were.
+- **The tabs stay where you put them.** Only the game's Map button (Select)
+  switches one by itself: it brings up the Map tab.
 - **Screen care:** the picture creeps a pixel at a time, up to 8 pixels from
   the middle, and **Dim when nothing changes** fades it after 2 minutes with
-  nothing happening during a run (30 seconds on the pause menu).
+  nothing happening during a run (30 seconds while the game is paused).
   **Brightness** (100, 85 or 70%) darkens the whole bottom screen. The first
   tap on a dimmed screen only wakes it.
 - **Settings** (the gear before a run and between runs): besides the

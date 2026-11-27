@@ -20,6 +20,7 @@ local calls = {}
 local function record(kind, a, b, c) calls[#calls + 1] = { kind = kind, a = a, b = b, c = c } end
 
 SchoolbagServer, SchoolbagHudHidden, SchoolbagStrings = nil, nil, nil
+SchoolbagBannerPaper = true -- most checks here are of the paper strip; titles only is checked near the end
 dofile("tests/stub_isaac.lua")
 local json = require("json") -- the stub's stand-in for the game's json
 W.render, W.curses = 0, 0
@@ -378,6 +379,24 @@ check(bar(c) == "Back:0 + Fill:1", "a sliver stays until the boss is dead")
 W.bosses[1].dead = true
 c = run(1)
 check(bar(c) == nil, "gone when the boss dies")
+
+print("titles only (the default since Nov 27 2026)")
+SchoolbagBannerPaper = nil
+W.bosses = nil
+newFloor(2, 0, 64)
+c = run(20)
+check(words(c) == "Sous-sol II" and (streak(c) or ""):match("^layer Text:"),
+  "a floor with a curse: its name on the ink alone, no curse strip")
+P.QueuedItem = { Item = { Type = 1, ID = 1, Name = "#THE_SAD_ONION_NAME", Description = "#THE_SAD_ONION_DESCRIPTION" } }
+c = run(10)
+check(words(c) == "The Sad Onion" and (streak(c) or ""):match("^layer Text:"), "an item: its name alone, no pickup line")
+P.QueuedItem = nil
+W.cards = { [0] = 3 }
+c = run(10)
+check(words(c) == "Card" and (streak(c) or ""):match("^layer Text:"), "a card picked up: its name alone")
+W.cards = nil
+run(80)
+SchoolbagBannerPaper = true
 
 print("only while the HUD is hidden")
 W.bosses = { { hp = 30, max = 60 } }

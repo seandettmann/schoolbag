@@ -48,8 +48,6 @@ public final class MainActivity extends Activity {
         view.ui.appVersion = BuildConfig.VERSION_NAME;
         view.ui.hideHud = prefs.getBoolean("hideHud", true);
         view.ui.dim = prefs.getBoolean("dim", true);
-        view.ui.follow = prefs.getBoolean("follow", prefs.getBoolean("roomOnWalkIn", true));
-        view.ui.showNewItems = prefs.getBoolean("showNewItems", true);
         view.ui.paperBrightness = prefs.getInt("paperBrightness", 100);
         view.ui.language = prefs.getString("language", "auto");
         view.words = App.words(getAssets(), view.ui.language);
@@ -99,8 +97,6 @@ public final class MainActivity extends Activity {
         prefs.edit()
                 .putBoolean("hideHud", view.ui.hideHud)
                 .putBoolean("dim", view.ui.dim)
-                .putBoolean("follow", view.ui.follow)
-                .putBoolean("showNewItems", view.ui.showNewItems)
                 .putInt("paperBrightness", view.ui.paperBrightness)
                 .putString("language", view.ui.language)
                 .apply();

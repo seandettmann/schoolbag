@@ -23,7 +23,8 @@ import io.github.seandettmann.schoolbag.core.Words;
  *
  * It draws only when something changes (a new state, a tap, the run clock's
  * second) or when the frame just drawn asked to be drawn again for an
- * animation, and follows the game's tabs if that's switched on. It also looks
+ * animation, and shows the Map tab when the game's Map button is pressed
+ * (the only tab change it makes by itself). It also looks
  * after the OLED: the picture creeps a point at a time around a loop up to 8
  * points from the middle, everything can be drawn darker, and the screen
  * fades down when nothing changes for a while.
@@ -41,7 +42,6 @@ final class HudView extends View implements Poller.Listener {
     static final int[][] SHIFT = loop(SHIFT_REACH);
     static final int MARGIN = 12;               // the floor reaches past the edges, so the shift never shows a gap
     static final long AWAKE_AFTER = 300_000;    // the screen kept on until 5 minutes after a run
-    static final long NEW_ITEM_FOR = 4_000;     // a new item's card, before going back
     static final float TAP_SLOP = 30, SWIPE = 120; // view pixels
     static final long TAP_TIME = 500, SWIPE_TIME = 600;
 
@@ -62,15 +62,9 @@ final class HudView extends View implements Poller.Listener {
     private long clockSecond = -1;
     private String lastSeed = null;
 
-    // following the game
-    private int lastRoom = -1;
-    private boolean lastRoomItems = false;
+    // the game's Map button, and its pause (for dimming)
     private long lastMapAt = -1;
     private boolean paused = false;
-    private String tabBeforePause = null;
-    private int lastItemCount = -1;
-    private long newItemUntil = 0;
-    private String tabBeforeNewItem = null;
 
     // drawing
     private float scale = 1, ox, oy;
@@ -135,11 +129,8 @@ final class HudView extends View implements Poller.Listener {
 
         String seed = inRun ? s.get("run").get("seed").str() : null;
         boolean newRun = seed != null && (!wasInRun || !seed.equals(lastSeed));
-        int room = s.get("room").get("index").integer(-1);
-        boolean roomItems = s.get("room").get("pedestals").size() > 0;
         long mapAt = s.get("input").get("mapAt").lng();
         boolean pausedNow = inRun && s.get("pauseMenu").bool();
-        int items = s.get("players").at(0).get("items").size();
         String tabBefore = ui.tab;
 
         if (newRun) {
@@ -147,45 +138,15 @@ final class HudView extends View implements Poller.Listener {
             ui.tab = "map";
             ui.detail = false;
             ui.roomDetail = false;
-            tabBeforePause = null;
-            cancelNewItem();
-        } else if (inRun && wasInRun) {
-            if (ui.follow) {
-                // the Room tab in a room with items (or when items turn up), the Map tab on leaving it
-                if (room != lastRoom) {
-                    if (roomItems) show("room");
-                    else if ("room".equals(ui.tab)) show("map");
-                } else if (roomItems && !lastRoomItems) {
-                    show("room");
-                }
-                // the game's Map button
-                if (lastMapAt >= 0 && mapAt != lastMapAt) show("map");
-                // the pause menu: the Items tab, and back again after
-                if (pausedNow && !paused) {
-                    tabBeforePause = ui.tab;
-                    show("items");
-                } else if (!pausedNow && paused) {
-                    if ("items".equals(ui.tab) && tabBeforePause != null) show(tabBeforePause);
-                    tabBeforePause = null;
-                }
-            }
-            // a new item: its card for a few seconds, then back
-            if (ui.showNewItems && lastItemCount >= 0 && items > lastItemCount && !pausedNow) {
-                if (!"items".equals(ui.tab)) tabBeforeNewItem = ui.tab;
-                ui.tab = "items";
-                ui.sel = -1;
-                ui.selKind = "run";
-                ui.detail = false;
-                if (tabBeforeNewItem != null) newItemUntil = now + NEW_ITEM_FOR;
-            }
+        } else if (inRun && wasInRun && lastMapAt >= 0 && mapAt != lastMapAt) {
+            // the game's Map button (Select): the Map tab. Otherwise the tabs stay
+            // where you put them (Sean, Nov 27 2026: no following the game)
+            ui.tab = "map";
         }
         if (!ui.tab.equals(tabBefore)) redraw = true;
 
-        lastRoom = room;
-        lastRoomItems = roomItems;
         lastMapAt = inRun ? mapAt : -1;
         paused = pausedNow;
-        lastItemCount = inRun ? items : -1;
         if (seed != null) lastSeed = seed;
         state = s;
         lastAnswer = now;
@@ -198,17 +159,6 @@ final class HudView extends View implements Poller.Listener {
         if (redraw) invalidate();
     }
 
-    /** A tab the game asked for; anything but Items ends a new item's visit there. */
-    private void show(String tab) {
-        ui.tab = tab;
-        if (!"items".equals(tab)) cancelNewItem();
-    }
-
-    private void cancelNewItem() {
-        newItemUntil = 0;
-        tabBeforeNewItem = null;
-    }
-
     private void silence() {
         long now = System.currentTimeMillis();
         if (state != null && now - lastAnswer > GRACE) {
@@ -217,7 +167,6 @@ final class HudView extends View implements Poller.Listener {
             clockSecond = -1;
             lastChange = now;
             paused = false;
-            cancelNewItem();
             ui.newPaper();
             invalidate();
         }
@@ -314,7 +263,6 @@ final class HudView extends View implements Poller.Listener {
         if (now < dimAt) next = Math.min(next, dimAt);                // dimming starts
         else if (now < dimAt + FADE) next = Math.min(next, now + 33); // dimming
         next = Math.min(next, (now / SHIFT_EVERY + 1) * SHIFT_EVERY); // the next pixel shift
-        if (newItemUntil > 0) next = Math.min(next, newItemUntil);    // back from a new item
         if (awake) next = Math.min(next, awakeUntil);                 // the screen allowed to sleep
         removeCallbacks(tick);
         postDelayed(tick, Math.max(1, next - now));
@@ -322,15 +270,6 @@ final class HudView extends View implements Poller.Listener {
 
     private void onTick() {
         long now = System.currentTimeMillis();
-        if (newItemUntil > 0 && now >= newItemUntil) {
-            String back = tabBeforeNewItem;
-            if ("items".equals(ui.tab) && back != null) {
-                // the item was taken from the room: nothing left to show there
-                if ("room".equals(back) && !lastRoomItems) back = "map";
-                ui.tab = back;
-            }
-            cancelNewItem();
-        }
         if (awake && now >= awakeUntil) {
             awake = false;
             setKeepScreenOn(false);
@@ -399,7 +338,6 @@ final class HudView extends View implements Poller.Listener {
         }
         if (acted) {
             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            cancelNewItem(); // the person chose: don't switch back for them
             performClick();
         }
         if (!before.equals(settingsKey()) && onChange != null) onChange.onSettingsChanged();
@@ -410,7 +348,7 @@ final class HudView extends View implements Poller.Listener {
     @Override public boolean performClick() { return super.performClick(); }
 
     String settingsKey() {
-        return ui.hideHud + "," + ui.dim + "," + ui.follow + "," + ui.showNewItems + "," + ui.paperBrightness + "," + ui.language;
+        return ui.hideHud + "," + ui.dim + "," + ui.paperBrightness + "," + ui.language;
     }
 
     /**

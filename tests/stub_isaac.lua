@@ -281,11 +281,20 @@ function game:GetHUD() return hud end
 
 function Game() return game end
 function GetPtrHash(e) return e.hash or e end
-Input = { IsActionTriggered = function(action)
-  if action == ButtonAction.ACTION_MAP then return W.mapPressed == true end
-  if action == ButtonAction.ACTION_PAUSE then return W.pausePressed == true end
-  return action == ButtonAction.ACTION_DROP and W.dropPressed == true
-end }
+-- Like the game: a trigger the game has already read (its own Map press) isn't
+-- reported to mods, so only IsActionPressed sees the Map button; and mods never
+-- see the pause button.
+Input = {
+  IsActionTriggered = function(action)
+    return action == ButtonAction.ACTION_DROP and W.dropPressed == true
+  end,
+  IsActionPressed = function(action, controller)
+    if action == ButtonAction.ACTION_MAP then
+      return W.mapPressed == true and (controller == -1 or controller == (W.mapController or 0))
+    end
+    return false
+  end,
+}
 
 Isaac = {
   GetPlayer = function(i) if i == 0 then return player end return (W.extra or {})[i] end,
