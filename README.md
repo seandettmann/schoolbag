@@ -2,13 +2,13 @@
 
 [![Made with Claude](https://img.shields.io/badge/made%20with-Claude-6A5C52)](#made-with-ai)
 
-This repo has two pieces, both called Schoolbag:
+Schoolbag, a dual-screen companion for The Binding of Isaac: Repentance+,
+comes in two pieces:
 
-- **The mod** (`mod/schoolbag`) runs inside The Binding of Isaac:
-  Repentance+ and sends your run to the app. It never changes the game. Get
-  it from the Steam Workshop.
-- **The app** (`app/`) shows your HUD on the bottom screen of a dual-screen
-  Android handheld like the AYN Thor. Get it from GitHub Releases, through
+- **The mod** (`mod/schoolbag`) runs inside the game and sends your run to
+  the app. It never changes the game. Get it from the Steam Workshop.
+- **The app** (`app/`) shows your HUD on the bottom screen of an Android
+  handheld like the AYN Thor. Get it from GitHub Releases, through
   Obtainium.
 
 ## How it works
@@ -298,8 +298,9 @@ test builds toward it.
 
 ## Credits and game art
 
-Schoolbag is an unofficial fan project. It isn't made or endorsed by Edmund
-McMillen or Nicalis, and it needs your own copy of the game.
+Schoolbag is an unofficial, fan-made dual-screen companion. It isn't made or
+endorsed by Edmund McMillen or Nicalis, and it needs your own copy of the
+game.
 
 The Binding of Isaac and all of its art are © Edmund McMillen and Nicalis.
 **No game art is in this repository.** The release APK is built with art

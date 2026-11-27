@@ -1,7 +1,7 @@
 # Schoolbag app
 
-The Android app that draws the bottom-screen HUD from the mod's state (see
-`../docs/protocol.md`). Plain Java and the Android framework only, no
+The Android half of Schoolbag, the dual-screen companion: it draws the HUD on
+the bottom screen from the mod's state (see `../docs/protocol.md`). Plain Java and the Android framework only, no
 libraries.
 
 - `src/main/java/.../core/`: everything that decides what's on screen (the
