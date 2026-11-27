@@ -110,7 +110,7 @@ final class Pages {
         p.sprite(doodle, cx + (iw - dw) / 2f, top, 2, 1f);
         h.centered(Face.TITLE, 96, 96, title, cx, top + dh + 14, iw, Hud.INK);
         for (int i = 0; i < sub.length; i++)
-            h.centered(Face.TITLE, 64, 64, sub[i], cx, top + dh + 14 + 96 + 14 + i * 64, iw, Hud.GREY);
+            h.centered(Face.TITLE, 64, 64, sub[i], cx, top + dh + 14 + 96 + 14 + i * 64, iw, Hud.INK);
     }
 
     // scribbles on the gear's and the back button's scraps, and the settings paper
@@ -189,12 +189,12 @@ final class Pages {
             h.text(Face.TITLE, ts, ts, "About", x, y + (rowH - ts) / 2f, Hud.INK);
             String aw = "Credits, version, speed";
             float tw = p.width(Face.SMALL, 40, aw);
-            h.text(Face.SMALL, 40, 40, aw, x + width - 33 - 14 - tw, y + (rowH - 40) / 2f + 4, Hud.GREY);
+            h.text(Face.SMALL, 40, 40, aw, x + width - 33 - 14 - tw, y + (rowH - 40) / 2f + 4, Hud.INK);
             p.sprite("arrow", x + width - 33, y + (rowH - 27) / 2f, 3, 1f);
             ui.hit(x, y, width, rowH, () -> ui.settings = "about");
         } else if ("about".equals(page)) {
             y -= 4;
-            h.text(Face.SMALL, 40, 44, "Schoolbag app " + ui.appVersion + " · mod " + (ui.modVersion.isEmpty() ? "?" : ui.modVersion) + " · GPL-3.0", x, y, Hud.GREY);
+            h.text(Face.SMALL, 40, 44, "Schoolbag app " + ui.appVersion + " · mod " + (ui.modVersion.isEmpty() ? "?" : ui.modVersion) + " · GPL-3.0", x, y, Hud.INK);
             y += 44 + 22;
             String[] lines = {"An unofficial fan app. Game art and words © Edmund McMillen and Nicalis.",
                     "Inspired by isaac-hud and the Eden Duo emulator’s companion for The Binding of Isaac.",
@@ -213,12 +213,12 @@ final class Pages {
             float lead = speed.length > 4 ? 37 : 40; // the controller's line: a little closer, to stay on the paper
             y += speed.length > 4 ? 2 : 8;
             for (String l : speed) {
-                h.text(Face.SMALL, 36, lead, l, x, y, Hud.GREY);
+                h.text(Face.SMALL, 36, lead, l, x, y, Hud.INK);
                 y += lead;
             }
         } else {
             y -= 4;
-            h.text(Face.SMALL, 40, 44, "For the banners the mod draws up top", x, y, Hud.GREY);
+            h.text(Face.SMALL, 40, 44, "For the banners the mod draws up top", x, y, Hud.INK);
             y += 44 + 24;
             float colW = (width - 40) / 3f;
             for (int i = 0; i < LANGS.length; i++) {

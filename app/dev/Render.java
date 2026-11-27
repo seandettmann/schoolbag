@@ -23,7 +23,8 @@ public final class Render {
         ui.paper = 0;
         ui.appVersion = "0.1.0";
         if (a.length > 3) ui.tab = a[3];
-        if (a.length > 4) ui.settings = a[4];
+        if (a.length > 4 && !a[4].equals("-")) ui.settings = a[4];
+        if (a.length > 6 && a[6].equals("open")) { ui.detail = true; ui.roomDetail = true; } // the item card opened
         if (a.length > 5 && a[5].equals("speed")) { // the About page with the longest speed lines likely
             ui.viewW = 1240; ui.viewH = 1080; ui.viewScale = 1; ui.framesLastMinute = 3600; ui.frameMs = 12.4f;
             ui.transport = "UDP (sent on changes)"; ui.modVersion = "0.3.0";

@@ -200,8 +200,7 @@ final class TabMap {
      * 3x with no names; on the pocket's side the one you'll use next stays on
      * the very right with a pencil line under it, and the next one is dimmed to
      * its left. When they switch (the drop button) they slide past each other
-     * into their new places. A pill's good, bad or horse is in grey under its
-     * name.
+     * into their new places. A pill's good, bad or horse is under its name.
      * Tainted Cain's bag sits on the right, in two rows. No headings: the
      * pictures say which is which.
      */
@@ -213,7 +212,7 @@ final class TabMap {
         // the trinkets, from the left
         List<Json.J> trinkets = player.get("trinkets").items();
         if (trinkets.isEmpty()) {
-            h.text(Face.SMALL, 44, 48, "No trinkets", STRIP_X0, cy - 24, Hud.NUMGREY);
+            h.text(Face.SMALL, 50, 54, "No trinkets", STRIP_X0, cy - 27, Hud.INK);
         } else if (trinkets.size() == 1) {
             Json.J t = trinkets.get(0);
             float pw = trinket(h, t.get("id").integer(), STRIP_X0, cy, false);
@@ -237,12 +236,12 @@ final class TabMap {
             }
         } else if (pockets.isEmpty()) {
             String t = "Empty pocket";
-            h.text(Face.SMALL, 44, 48, t, STRIP_X1 - p.width(Face.SMALL, 44, t), cy - 24, Hud.NUMGREY);
+            h.text(Face.SMALL, 50, 54, t, STRIP_X1 - p.width(Face.SMALL, 50, t), cy - 27, Hud.INK);
         } else if (pockets.size() == 1) {
             Json.J it = pockets.get(0);
             pocket(h, it, STRIP_X1 - 48, cy, 1f);
             String name, note = "";
-            int color = Hud.INK;
+            int color = Hud.INK; // every word in ink (Sean, Nov 27 2026)
             if (it.get("kind").str().equals("pill")) {
                 if (it.get("identified").bool()) {
                     int eff = it.get("effect").integer();
@@ -251,9 +250,8 @@ final class TabMap {
                     note = cls.equals("+") ? "Good pill" : cls.equals("-") ? "Bad pill" : "";
                 } else {
                     name = "???";
-                    color = Hud.NUMGREY;
                 }
-                if ((it.get("color").integer() & 2048) != 0) note = note.isEmpty() ? "Horse pill" : note + ", horse pill";
+                if ((it.get("color").integer() & 2048) != 0) note = note.isEmpty() ? "Horse pill" : note.replace(" pill", " horse pill"); // "Good horse pill"
             } else {
                 // a tarot card without its number: "The Fool", not "0 - The Fool"
                 name = w.text(it.get("name").str()).replaceFirst("^[0IVXLC]+ +- +", "");
@@ -344,23 +342,35 @@ final class TabMap {
 
     /**
      * A name beside a picture on the strip, on up to two lines, with an optional
-     * grey note under it, centred on cy. Left-aligned from x, or right-aligned
-     * to x when mirrored (the pocket's side).
+     * note under it, centred on cy, all in ink. As big as fits: 54, or 48 or 40
+     * for a long name with a note under it, so it stays inside the strip's
+     * paper (136 of its 172 points). Left-aligned from x, or right-aligned to x
+     * when mirrored (the pocket's side).
      */
     private static void nameLines(Hud h, String name, String note, int color, float x, float width, float cy, boolean mirrored) {
-        List<String> lines = h.wrap(Face.SMALL, 40, name, width);
-        int n = Math.min(lines.size(), 2);
-        if (lines.size() > 2) lines.set(1, h.fit(Face.SMALL, 40, lines.get(1) + " " + lines.get(2), width));
         boolean hasNote = note != null && !note.isEmpty();
-        float total = n * 48 + (hasNote ? 40 : 0), y = cy - total / 2f;
+        float size = 54, lead = 0, noteSize = 0, total = 0;
+        List<String> lines = null;
+        int n = 0;
+        for (float s : new float[] {54, 48, 40}) {
+            size = s;
+            lead = Math.round(s * 1.1f);
+            noteSize = Math.round(s * 0.8f);
+            lines = h.wrap(Face.SMALL, s, name, width);
+            n = Math.min(lines.size(), 2);
+            total = n * lead + (hasNote ? noteSize + 4 : 0);
+            if (lines.size() <= 2 && total <= 136) break;
+        }
+        if (lines.size() > 2) lines.set(1, h.fit(Face.SMALL, size, lines.get(1) + " " + lines.get(2), width));
+        float y = cy - total / 2f;
         for (int i = 0; i < n; i++) {
             String l = lines.get(i);
-            h.text(Face.SMALL, 40, 48, l, mirrored ? x - h.p().width(Face.SMALL, 40, l) : x, y, color);
-            y += 48;
+            h.text(Face.SMALL, size, lead, l, mirrored ? x - h.p().width(Face.SMALL, size, l) : x, y, color);
+            y += lead;
         }
         if (hasNote) {
-            String l = h.fit(Face.SMALL, 34, note, width);
-            h.text(Face.SMALL, 34, 40, l, mirrored ? x - h.p().width(Face.SMALL, 34, l) : x, y, Hud.GREY);
+            String l = h.fit(Face.SMALL, noteSize, note, width);
+            h.text(Face.SMALL, noteSize, noteSize + 4, l, mirrored ? x - h.p().width(Face.SMALL, noteSize, l) : x, y, Hud.INK);
         }
     }
 

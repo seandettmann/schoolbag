@@ -17,7 +17,7 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
 - The strip under the map has your trinkets on the left and your pocket on
   the right, where the game's HUD has them, each in at most half the strip.
   One thing on a side shows at full size with its name beside it, towards
-  the middle (a pill's good, bad or horse in grey under its name); two show
+  the middle (a pill's good, bad or horse under its name); two show
   side by side at full size, without names. With two pocket items, the one
   you'll use next stays on the very right with a pencil line under it, and
   the next one is dimmed to its left; when you switch them, they slide past
@@ -65,6 +65,12 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   items** are gone: walking into a room, picking something up or pausing no
   longer switches tabs. The game's Map button (Select) still brings up the
   Map tab.
+- Easier to read on the Thor: every word is in ink (no more greys), the
+  small lettering is bigger (the Map strip's names, item numbers, pickup
+  lines), and the closed tabs and the stat and pickup icons are brighter. A
+  long name on the Map strip, or a long pickup line, steps down a size
+  before it's cut short. With an item's full description open, its card
+  shows how to close it in place of the pickup line.
 
 **Mod 0.3.2**
 - Banners show the name alone, on the ink: no paper strip with a pickup

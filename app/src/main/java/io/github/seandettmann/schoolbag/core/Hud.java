@@ -14,7 +14,8 @@ import java.util.Locale;
  */
 public final class Hud {
     static final int W = 1240, H = 1080;
-    static final int INK = 0xFF362F2D, GREY = 0xFF6A5C52, NUMGREY = 0xFF7E6F62, HUDTEXT = 0xFFF5F0EA,
+    // every word on paper is in INK (no greys since Nov 27 2026, for legibility)
+    static final int INK = 0xFF362F2D, HUDTEXT = 0xFFF5F0EA,
             FLOORTEXT = 0xFFBDB0A2, CURSETEXT = 0xFFE6CCF7, BLACK = 0xFF000000, PAPER = 0xFFC7B29A;
     // the main page's box: its top-left, and how many game pixels taller every
     // page is than its art (the room the one-line header gave back)
@@ -33,9 +34,11 @@ public final class Hud {
     static final float NAME = 72;      // an item's name on its card
     static final float BODY = 60;      // the small hand lettering on cards and strips
     static final float DETAIL = 46;    // an item's full description
-    // parts that are the same every run (tab scraps, stat and pickup icons) are
-    // drawn this bright, so they wear the OLED no faster than what changes
-    static final float STATIC = 0.85f;
+    // parts that are the same every run (tab scraps, stat and pickup icons):
+    // full strength since Nov 27 2026 (Sean), for legibility; they were at 85% so
+    // they'd wear the OLED no faster than what changes, and the pixel shift still
+    // moves them
+    static final float STATIC = 1f;
 
     private final Painter p;
     private final Ui ui;
@@ -221,9 +224,10 @@ public final class Hud {
 
     /**
      * The card at the bottom of the Items and Room tabs: the item's picture at 4x,
-     * its name and pickup line beside it. Tapping it opens (or closes) the item's
-     * full description above; while that's open, a grey line under the pickup
-     * line says how to close it.
+     * its name and pickup line beside it, in ink. Tapping it opens (or closes)
+     * the item's full description above; while that's open, the full text is
+     * already there, so a line saying how to close it takes the pickup line's
+     * place (Nov 27 2026: bigger lettering, and both lines no longer fit).
      */
     void itemCard(int id, String nameCode, boolean blind, boolean open, String back, Runnable toggle) {
         float x0 = CARD_X0, cy = CARD_MID;
@@ -232,10 +236,14 @@ public final class Hud {
         String name = blind ? "???" : w.text(nameCode);
         String quote = blind ? "Curse of the Blind hides this one" : w.quote("collectibles", id);
         float tx = x0 + 128 + 32, tw = CARD_X1 - tx;
-        float top = cy - (70 + 54 + (open ? 46 : 0)) / 2f;
+        float top = cy - (70 + 64) / 2f;
         text(Face.TITLE, 64, 70, fit(Face.TITLE, 64, name, tw), tx, top, INK);
-        text(Face.SMALL, 48, 54, fit(Face.SMALL, 48, quote, tw), tx, top + 70, GREY);
-        if (open) text(Face.SMALL, 40, 46, fit(Face.SMALL, 40, back, tw), tx, top + 124, NUMGREY);
+        if (open) text(Face.SMALL, 50, 64, fit(Face.SMALL, 50, back, tw), tx, top + 70, INK);
+        else {
+            // as big as fits on one line: 58, or 52 or 46 for a long one (cut short past that)
+            float qs = p.width(Face.SMALL, 58, quote) <= tw ? 58 : p.width(Face.SMALL, 52, quote) <= tw ? 52 : 46;
+            text(Face.SMALL, qs, 64, fit(Face.SMALL, qs, quote, tw), tx, top + 70 + (58 - qs) / 2f, INK);
+        }
         if (!blind) ui.hit(MX + x0 - 6, MY + cy - 112, CARD_X1 - x0 + 12, 224, toggle);
     }
 
@@ -624,7 +632,7 @@ public final class Hud {
             float y = TABS_Y;
             p.save();
             p.rotate((Float) tab[3], x + w / 2f, y + h / 2f);
-            p.brightness(active ? STATIC : 0.55f);
+            p.brightness(active ? STATIC : 0.8f);
             p.spritePart(art, 0, 0, keep, size[1], x, y, 2, 1f);
             p.spritePart(art, from, 0, size[0] - from, size[1], x + keep * 2, y, 2, 1f);
             scribbles(p, (Object[][]) tab[8], x, y);

@@ -101,8 +101,8 @@ final class TabItems {
             for (float[] d : offs) p.text(Face.SMALL, fs, t, tx + d[0], base + d[1], Hud.PAPER);
             p.text(Face.SMALL, fs, t, tx, base, Hud.INK);
         }
-        if (zoom == 3) h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
-        else h.text(Face.SMALL, 30, 30, String.valueOf(i + 1), x + 2, y + 64, Hud.NUMGREY);
+        if (zoom == 3) h.text(Face.SMALL, 50, 50, String.valueOf(i + 1), x + 4, y + 94, Hud.INK);
+        else h.text(Face.SMALL, 38, 38, String.valueOf(i + 1), x + 2, y + 62, Hud.INK);
         final int index = i;
         // the whole cell, gaps included (120 x 126 at 3x, 80 x 96 at 2x)
         ui.hit(Hud.MX + x - (zoom == 3 ? 12 : 8), Hud.MY + y - 5, zoom == 3 ? 120 : 80, zoom == 3 ? 126 : 96, () -> {

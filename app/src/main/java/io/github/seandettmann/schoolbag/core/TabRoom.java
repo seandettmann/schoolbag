@@ -91,7 +91,7 @@ final class TabRoom {
             else h.itemCell("items", ped.get("id").integer(), x, y, 3, 1f);
             // the selected one: a pencil line under it, as under the pocket item in use
             if (i == ui.roomSel) h.underItem("items", ped.get("id").integer(), blindOne, x, y);
-            h.text(Face.SMALL, 40, 40, String.valueOf(i + 1), x + 4, y + 98, Hud.NUMGREY);
+            h.text(Face.SMALL, 50, 50, String.valueOf(i + 1), x + 4, y + 94, Hud.INK);
             final int index = i;
             ui.hit(Hud.MX + x - 12, Hud.MY + y - 5, 120, 127, () -> { ui.roomSel = index; ui.roomDetail = false; });
         }
