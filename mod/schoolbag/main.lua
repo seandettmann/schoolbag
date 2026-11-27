@@ -1718,7 +1718,8 @@ local REMIND_DETAIL = { luadebug = "Needs --luadebug", bind = "Port " .. PORT ..
 local INK = { 54 / 255, 47 / 255, 45 / 255 } -- the dark ink the game writes on paper with
 
 -- Titles only (Sean, Nov 27 2026): every banner the mod draws is the name on
--- the ink, without the paper strip and its line under it. Setting
+-- the ink, without the paper strip and its line under it, except the offline
+-- reminder, whose line is the fix. Setting
 -- `SchoolbagBannerPaper = true` (in the debug console, or a test) brings the
 -- strip back.
 local function bannerPaper() return SchoolbagBannerPaper == true end
@@ -1900,17 +1901,18 @@ local function drawReminder()
 
   local art = reminderArt()
   local x, y = Isaac.GetScreenWidth() / 2, REMIND_Y
-  local detail = bannerPaper() and (REMIND_DETAIL[serverProblem] or "") or nil
+  -- the one banner that keeps its paper strip: its line says how to fix it (Sean, Nov 27 2026)
+  local detail = REMIND_DETAIL[serverProblem] or ""
   if not (art.streak and art.title and art.detail) then
     -- the game's art or fonts couldn't be found: plain text instead
     if words then
-      local line = REMIND_TITLE .. (detail and (": " .. detail) or "")
+      local line = REMIND_TITLE .. ": " .. detail
       local w = try(function() return Isaac.GetTextWidth(line) end) or 0
       Isaac.RenderText(line, x - w / 2, y - 6, 1, 1, 1, 1)
     end
     return
   end
-  drawStreak(art, anim, frame, x, y, REMIND_TITLE, detail, words) -- the ink (and its paper, if kept)
+  drawStreak(art, anim, frame, x, y, REMIND_TITLE, detail, words) -- ink and paper fly in together
 end
 
 -- A busy port may come free during the run: try again every few seconds.

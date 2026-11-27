@@ -68,8 +68,8 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
 
 **Mod 0.3.2**
 - Banners show the name alone, on the ink: no paper strip with a pickup
-  line, curse or detail under it, for items, cards, pills, floors and the
-  "Schoolbag is offline" banner alike.
+  line or curse under it, for items, cards, pills and floors. The
+  "Schoolbag is offline" banner keeps its strip, since its line is the fix.
 - The Map button (Select) is noticed again, on any controller.
 
 **Mod 0.3.1**

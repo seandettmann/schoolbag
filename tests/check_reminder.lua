@@ -204,20 +204,12 @@ check(t and t.a == "Schoolbag is offline: Needs --luadebug" and not find(c, "spr
 c = frames(30 * 60)
 check(find(c, "text") ~= nil, "and that stays up too")
 
-print("titles only (the default since Nov 27 2026)")
+print("titles only elsewhere, but this banner keeps its strip (Nov 27 2026)")
 fresh({ noSocket = true, titlesOnly = true })
 fire(ModCallbacks.MC_POST_GAME_STARTED, false)
 c = frames(4 * 30 + 10)
-local layer = find(c, "layer", "gfx/ui/ui_streak.anm2")
-check(layer and layer.b == "TextStay:0" and layer.c.layer == 0 and not find(c, "sprite"),
-  "only the ink is drawn, no paper strip")
-check(find(c, "font", "Schoolbag is offline") and #(function() local n = {} for _, x in ipairs(c) do if x.kind == "font" then n[#n + 1] = x end end return n end)() == 1,
-  "just the title, no detail line")
-fresh({ noSocket = true, titlesOnly = true, noArt = true })
-fire(ModCallbacks.MC_POST_GAME_STARTED, false)
-c = frames(4 * 30 + 10)
-t = find(c, "text")
-check(t and t.a == "Schoolbag is offline", "the plain-text fallback is the title alone")
+check(find(c, "sprite", "gfx/ui/ui_streak.anm2") and find(c, "font", "Needs --luadebug"),
+  "the offline banner still has its paper strip and its line")
 
 print("server running")
 fresh({})

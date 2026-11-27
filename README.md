@@ -45,8 +45,8 @@ The format is in [`docs/protocol.md`](docs/protocol.md).
   stand-in for the game's API (see `tests/`), and in the real game on the
   Thor up to 0.3.1. Since 0.3.0 it never makes the game wait on the app,
   sends the state over UDP only when it changes, and reports the Map button
-  and its own timing. 0.3.2 draws every banner as the name on the ink
-  alone, without the paper strip under it.
+  and its own timing. 0.3.2 draws the banners as the name on the ink
+  alone, without the paper strip under it (the offline reminder keeps its).
 - **App 0.3.0** (test builds, the newest a pre-release): 0.2.0 is the last
   release. 0.3.0 reworks the pages after the first Thor tests: tabs that
   don't move, a new strip under each page, scrolling grids of 7 a row on the
