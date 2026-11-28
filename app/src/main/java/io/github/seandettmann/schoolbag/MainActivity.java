@@ -16,7 +16,7 @@ import android.view.WindowInsetsController;
 import android.view.WindowManager;
 
 /**
- * Schoolbag: the bottom-screen HUD for The Binding of Isaac. One full-screen
+ * Schoolbag: a dual-screen companion for The Binding of Isaac. One full-screen
  * view; Cocoon (or the launcher) opens and closes it.
  *
  * Opened on the big screen, it moves itself to the small one. Once the game

@@ -196,7 +196,7 @@ final class Pages {
             y -= 4;
             h.text(Face.SMALL, 40, 44, "Schoolbag app " + ui.appVersion + " · mod " + (ui.modVersion.isEmpty() ? "?" : ui.modVersion) + " · GPL-3.0", x, y, Hud.INK);
             y += 44 + 22;
-            String[] lines = {"An unofficial fan app. Game art and words © Edmund McMillen and Nicalis.",
+            String[] lines = {"An unofficial, fan-made dual-screen companion. Game art and words © Edmund McMillen and Nicalis.",
                     "Inspired by isaac-hud and the Eden Duo emulator’s companion for The Binding of Isaac.",
                     "Made with AI, using Claude by Anthropic."};
             for (String l : lines) {

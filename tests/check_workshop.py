@@ -27,7 +27,8 @@ check("visibility" not in pairs, "leaves visibility to the Workshop page")
 check(os.path.isfile(os.path.join(pairs.get("contentfolder", ""), "metadata.xml")), "the content is the mod folder")
 check(pairs.get("previewfile", "").endswith("mod/preview.png"), "mod/preview.png is the image")
 check(pairs.get("title") == "Schoolbag", "the name comes from metadata.xml")
-check(pairs.get("description", "").startswith("Companion mod"), "the description comes from metadata.xml")
+check(pairs.get("description") == meta["description"] and "dual-screen companion" in meta["description"],
+      "the description comes from metadata.xml")
 note = pairs.get("changenote", "")
 check(note.startswith(f"Schoolbag mod {meta['version']} (abc1234)"), "the change note names the version and commit")
 
