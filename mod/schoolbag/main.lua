@@ -17,7 +17,7 @@
 
 local mod = RegisterMod("Schoolbag", 1)
 
-local VERSION = "0.3.2"
+local VERSION = "0.3.3"
 local PROTOCOL = 1
 local HOST, PORT = "127.0.0.1", 8089
 local SCAN_EVERY = 10 -- game updates between inventory scans (30 updates = 1 s)
@@ -94,6 +94,19 @@ local K = {
   GUPPYS_COLLAR  = enum(CollectibleType, "COLLECTIBLE_GUPPYS_COLLAR", 212),
   BROKEN_ANKH    = enum(TrinketType, "TRINKET_BROKEN_ANKH", 28),
   WOODEN_CROSS   = enum(TrinketType, "TRINKET_WOODEN_CROSS", 121),
+  -- what tips a deal towards an angel room (see dealShare)
+  KEY_PIECE_1    = enum(CollectibleType, "COLLECTIBLE_KEY_PIECE_1", 238),
+  KEY_PIECE_2    = enum(CollectibleType, "COLLECTIBLE_KEY_PIECE_2", 239),
+  EUCHARIST      = enum(CollectibleType, "COLLECTIBLE_EUCHARIST", 499),
+  BOOK_OF_VIRTUES = enum(CollectibleType, "COLLECTIBLE_BOOK_OF_VIRTUES", 584),
+  ACT_OF_CONTRITION = enum(CollectibleType, "COLLECTIBLE_ACT_OF_CONTRITION", 643),
+  ROSARY_BEAD    = enum(TrinketType, "TRINKET_ROSARY_BEAD", 7),
+  ANGEL_SPAWNED  = enum(GameStateFlag, "STATE_FAMINE_SPAWNED", 0), -- Repentance reuses it for "angel room spawned"
+  DEVIL_SPAWNED  = enum(GameStateFlag, "STATE_DEVILROOM_SPAWNED", 5),
+  DEVIL_VISITED  = enum(GameStateFlag, "STATE_DEVILROOM_VISITED", 6),
+  EVIL_BUM_KILLED = enum(LevelStateFlag, "STATE_EVIL_BUM_KILLED", 1),
+  BUM_LEFT       = enum(LevelStateFlag, "STATE_BUM_LEFT", 3),
+  EVIL_BUM_LEFT  = enum(LevelStateFlag, "STATE_EVIL_BUM_LEFT", 4),
   GOLDEN_TRINKET = enum(TrinketType, "TRINKET_GOLDEN_FLAG", 32768),
   HORSE_PILL     = enum(PillColor, "PILL_GIANT_FLAG", 2048),
   -- curses (bit flags)
@@ -1212,15 +1225,87 @@ local function playerInfo(i, p, curses)
   return t
 end
 
+-- Whether any player holds an item or trinket, as the game counts it for deals
+-- (modifiers included, so Tainted Lazarus's shared key pieces count too).
+local function anyoneHas(kind, id)
+  for i = 0, game:GetNumPlayers() - 1 do
+    local p = Isaac.GetPlayer(i)
+    if p then
+      if kind == "trinket" then
+        if p:HasTrinket(id, false) then return true end
+      elseif p:HasCollectible(id, false) then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- How much of the deal chance is the devil's (0 to 1); the rest is the angel's.
+-- Room:GetDevilRoomChance is the chance of a deal of either kind, and the
+-- game's Found HUD splits it into its devil and angel numbers. These are the
+-- game's rules for the split, as IsaacDocs sets them out under
+-- Room:GetDevilRoomChance (current for Repentance as of January 2024). Raises
+-- an error if the game won't answer, so the caller can tell.
+local function dealShare(level)
+  local function has(id) return anyoneHas("item", id) end
+  local function flag(f) return game:GetStateFlag(f) == true end
+  local function floorFlag(f) return level:GetStateFlag(f) == true end
+  -- the floor's angel bonus: confessionals, sacrifice room blessings...
+  local bonus = level:GetAngelRoomChance()
+  assert(type(bonus) == "number", "GetAngelRoomChance gave " .. type(bonus))
+  local virtues, contrition = has(K.BOOK_OF_VIRTUES), has(K.ACT_OF_CONTRITION)
+  local seen, visited = flag(K.DEVIL_SPAWNED), flag(K.DEVIL_VISITED)
+
+  local share = 1
+  if has(K.EUCHARIST) then
+    share = 0
+  elseif seen and visited and game:GetDevilRoomDeals() > 0 then
+    -- a devil deal taken locks angels out, unless something lets them back in
+    if virtues or contrition or bonus > 0 then share = 0.5 end
+  elseif seen or virtues or bonus > 0 then
+    -- the first deal seen and skipped (never walked into) makes the next one an
+    -- angel room; after that, or once inside, it's even
+    if visited or flag(K.ANGEL_SPAWNED) then share = 0.5 else share = 0 end
+  end
+  if share ~= 0.5 then return share end
+
+  if anyoneHas("trinket", K.ROSARY_BEAD) then share = share * 0.5 end
+  if game:GetDonationModAngel() >= 10 then share = share * 0.5 end -- 10 coins in the shop's machine
+  if has(K.KEY_PIECE_1) then share = share * 0.75 end
+  if has(K.KEY_PIECE_2) then share = share * 0.75 end
+  if floorFlag(K.EVIL_BUM_KILLED) then share = share * 0.75 end
+  local bumLeft, evilLeft = floorFlag(K.BUM_LEFT), floorFlag(K.EVIL_BUM_LEFT)
+  if bumLeft and not evilLeft then share = share * 0.9 end
+  if evilLeft and not bumLeft then share = share * 1.1 end
+  -- a negative bonus only counts with the items that allow angels after a deal
+  if bonus > 0 or (bonus < 0 and (virtues or contrition)) then share = share * (1 - bonus) end
+  if virtues then share = share * 0.75 end
+  return math.max(0, math.min(1, share))
+end
+
 local function chancesInfo(level)
   local c = {}
-  local devil = try(function() return game:GetRoom():GetDevilRoomChance() end)
-  if devil then c.devil = round(math.max(0, math.min(1, devil)), 3) end
+  local deal = try(function() return game:GetRoom():GetDevilRoomChance() end)
+  if deal then
+    deal = math.max(0, math.min(1, deal))
+    local ok, share = pcall(dealShare, level)
+    if ok then
+      c.devil = round(deal * share, 3)
+      c.angel = round(deal * (1 - share), 3)
+    else
+      -- can't tell the two apart: the whole chance as the devil's, no angel
+      problem("angel chance failed: " .. shortErr(share))
+      c.devil = round(deal, 3)
+    end
+  end
   local planet = try(function() return level:GetPlanetariumChance() end)
     or try(function() return game:GetPlanetariumChance() end)
   if planet then c.planetarium = round(math.max(0, math.min(1, planet)), 3) end
   return c
 end
+
+SchoolbagChances = chancesInfo -- for tests, and for a look from the debug console
 
 local function transitionInfo(p)
   local sprite = p and p:GetSprite()
@@ -1527,7 +1612,7 @@ function lines(s) {
     (s.map && s.map.mirrored ? ", MIRROR WORLD" : "") + (s.transition ? ", leaving by " + s.transition : "")
     : "floor: not sent (see PROBLEMS)");
   var c = s.chances || {};
-  out.push("chances: devil " + pct(c.devil) + ", planetarium " + pct(c.planetarium));
+  out.push("chances: devil " + pct(c.devil) + ", angel " + pct(c.angel) + ", planetarium " + pct(c.planetarium));
   (s.players || []).forEach(function (p) {
     var k = p.pickups || {};
     out.push("");

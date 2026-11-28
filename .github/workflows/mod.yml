@@ -47,7 +47,7 @@ jobs:
           sudo apt-get install -y -q lua5.3 lua-socket
           python3 tests/check_workshop.py
           python3 tests/check_mod.py
-          for t in reminder hud banners bag net collection; do lua5.3 "tests/check_$t.lua"; done
+          for t in reminder hud banners bag net collection deals; do lua5.3 "tests/check_$t.lua"; done
 
       - name: What to upload
         env:

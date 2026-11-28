@@ -117,7 +117,11 @@ PickupVariant = { PICKUP_COLLECTIBLE = 100, PICKUP_HEART = 10, PICKUP_COIN = 20,
   PICKUP_BOMB = 40, PICKUP_POOP = 42, PICKUP_PILL = 70, PICKUP_LIL_BATTERY = 90, PICKUP_TAROTCARD = 300 }
 RoomType = { ROOM_BOSS = 5 }
 StageType = { STAGETYPE_REPENTANCE = 4, STAGETYPE_REPENTANCE_B = 5 }
-GameStateFlag = { STATE_BOSSRUSH_DONE = 3, STATE_BLUEWOMB_DONE = 4 }
+GameStateFlag = { STATE_BOSSRUSH_DONE = 3, STATE_BLUEWOMB_DONE = 4,
+  STATE_FAMINE_SPAWNED = 0, STATE_DEVILROOM_SPAWNED = 5, STATE_DEVILROOM_VISITED = 6 }
+LevelStateFlag = { STATE_EVIL_BUM_KILLED = 1, STATE_BUM_LEFT = 3, STATE_EVIL_BUM_LEFT = 4 }
+-- the deal items and Rosary Bead are left out of CollectibleType and
+-- TrinketType: the mod has fallbacks
 -- PlayerForm intentionally left out: the mod must cope with a missing enum.
 
 ----------------------------------------------------------------------------
@@ -179,11 +183,17 @@ local level = {
   GetCurrentRoomDesc = function() return { SafeGridIndex = 45 } end,
   GetCurrentRoomIndex = function() return W.roomIndex end,
   GreedModeWave = 6,
+  -- deals: W.levelFlags = { [LevelStateFlag] = true }, W.angelBonus
+  GetStateFlag = function(_, f) return (W.levelFlags or {})[f] == true end,
+  GetAngelRoomChance = function()
+    if W.breakAngel then error("renamed in a game update") end
+    return W.angelBonus or 0
+  end,
 }
 
 local room = {
   GetType = function() return W.roomType end,
-  GetDevilRoomChance = function() return 0.3333333 end,
+  GetDevilRoomChance = function() return W.dealChance or 0.3333333 end,
   IsMirrorWorld = function() return W.mirror == true end,
 }
 
@@ -268,7 +278,10 @@ function game:GetNumPlayers() return 1 + #(W.extra or {}) end
 function game:IsPaused() return W.paused end
 function game:GetSeeds() return { GetStartSeedString = function() return W.seed end } end
 function game:GetVictoryLap() return 0 end
-function game:GetStateFlag(f) return f == 3 end
+-- W.flags = { [GameStateFlag] = true } for the deal flags
+function game:GetStateFlag(f) return f == 3 or (W.flags or {})[f] == true end
+function game:GetDevilRoomDeals() return W.deals or 0 end
+function game:GetDonationModAngel() return W.donated or 0 end
 function game:IsGreedMode() return W.greed end
 function game:GetGreedWavesNum() return 11 end
 function game:GetItemPool() return pool end

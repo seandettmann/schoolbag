@@ -74,6 +74,12 @@ Needs the Schoolbag mod 0.3.0 (Workshop).
   before it's cut short. With an item's full description open, its card
   shows how to close it in place of the pickup line.
 
+**Mod 0.3.3**
+- Sends the angel deal chance, so the stats column's angel row has a
+  number. The devil chance now matches the game's HUD too: the game splits
+  the chance of a deal between devil and angel, and Schoolbag showed all of
+  it as the devil's. /watch's "chances" line shows both.
+
 **Mod 0.3.2**
 - Banners show the name alone, on the ink: no paper strip with a pickup
   line or curse under it, for items, cards, pills and floors. The

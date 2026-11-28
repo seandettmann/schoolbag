@@ -105,7 +105,7 @@ def base_state():
             {"id": 118, "name": NAMES[118], "group": 0},
         ]},
         "players": [base_player()],
-        "chances": {"devil": 0.333, "planetarium": 0.01},
+        "chances": {"devil": 0.333, "angel": 0.0, "planetarium": 0.01},
         "death": {"gameOver": False},
     }
 

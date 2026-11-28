@@ -30,7 +30,8 @@ The game's own HUD comes back by itself:
 ## On the bottom screen
 
 - **Always showing:** your active item and its charge, hearts, coins, bombs
-  and keys, your stats, and the devil deal and Planetarium chances. Along
+  and keys, your stats, and the devil deal, angel deal and Planetarium
+  chances. Along
   the top: the floor, its curses and the run's clock.
 - **Map:** the floor's map, as much as you've uncovered, with your trinkets
   and pocket items underneath.
@@ -75,7 +76,7 @@ Good to know:
 Schoolbag is still being tested on the Thor, and the mod isn't public on the
 Workshop yet.
 
-- **Mod 0.3.2:** on the Steam Workshop, private while testing.
+- **Mod 0.3.3:** on the Steam Workshop, private while testing.
 - **App 0.3.0:** in testing; 0.2 is the latest release. Test builds are
   pre-releases, which Obtainium skips unless you turn on "Include
   prereleases".
@@ -88,7 +89,6 @@ What changed in each version is in [`CHANGELOG.md`](CHANGELOG.md).
 - Jacob & Esau: both brothers' trinkets and pocket items (only Jacob's show
   today).
 - The Boss Rush and Hush countdowns, transformations, and what killed you.
-- The angel deal chance.
 - Finishing the testing on the Thor.
 
 **Parked** (on hold, with the work kept)
@@ -204,7 +204,6 @@ itself to the bottom one.
 ### Roadmap notes
 
 - **Jacob & Esau** follows the game's own layout (designed, not built).
-- **The angel deal chance:** the mod doesn't send it yet.
 - **Testing:** the mod is tested against a stand-in for the game's API (see
   `tests/`), and was tested in the real game on the Thor up to 0.3.1. Still
   to do on the Thor: banners, boss bar, characters, Jacob & Esau, the Bag of

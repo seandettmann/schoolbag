@@ -339,7 +339,24 @@ The game's mod API can't read the bag (only REPENTOGON can), so the mod works it
 
 ## `chances`
 
-Present when the game exposes them: `devil` (0–1) and `planetarium` (0–1).
+Present when the game exposes them: `devil`, `angel` and `planetarium`, each
+0–1.
+
+`devil` and `angel` are the two numbers the game's Found HUD shows. The game's
+mod API gives only the chance of a deal of either kind
+(`Room:GetDevilRoomChance`, capped at 1); the mod splits it the way the game
+does, by the rules IsaacDocs sets out under that call: whether a devil room
+has been seen, walked into or dealt with, The Eucharist, Book of Virtues, Act
+of Contrition, Rosary Bead, the key pieces, the shop's donation machine, this
+floor's beggars and its angel bonus (`Level:GetAngelRoomChance`: confessionals,
+sacrifice room blessings). `devil + angel` is the deal chance, give or take
+rounding. If the game won't answer one of those calls, `angel` is left out
+and `devil` is the whole deal chance (and it's listed in `problems`).
+
+Tainted Lazarus: The Eucharist, Book of Virtues or Act of Contrition held only
+by his other form don't count (the mod can't see them without REPENTOGON), so
+the split can differ from the game's then. Key pieces are shared and do count.
+
 The app shows `planetarium` as a ninth stat under the angel chance; the game
 itself doesn't show it.
 

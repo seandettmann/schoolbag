@@ -110,7 +110,7 @@ try:
           "map only has rooms the game shows (no spoilers)")
     check(s["floor"]["bossCleared"] is False and "name" not in s["floor"], "floor info; failing GetName left out")
     check(s["run"]["seed"] == "ABCD EFGH" and s["run"]["bossRushDone"] is True, "run info")
-    check(s["chances"]["devil"] == 0.333, "devil chance")
+    check(s["chances"]["devil"] == 0.333 and s["chances"]["angel"] == 0, "devil and angel chances")
 
     print("cursed floor")
     step("cursed")

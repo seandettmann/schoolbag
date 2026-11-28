@@ -4,6 +4,6 @@
     <directory>schoolbag</directory>
     <id>3846036075</id>
     <description>The mod half of Schoolbag, a dual-screen companion for The Binding of Isaac: Repentance+ on handhelds like the AYN Thor. This mod doesn't change the game. It shares your run (health, items, map, room, stats) with the Schoolbag app on the same device over a local-only connection. Needs the --luadebug launch option.</description>
-    <version>0.3.2</version>
+    <version>0.3.3</version>
     <visibility>Private</visibility>
 </metadata>
